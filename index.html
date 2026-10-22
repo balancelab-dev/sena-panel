@@ -373,6 +373,7 @@ table.data tr:last-child td{border-bottom:none}
 .pos{color:var(--good)}.neg{color:var(--crit)}
 .hide{display:none!important}
 .searchbox{position:relative;flex:1;max-width:320px}
+.ara-dugme{width:100%;justify-content:flex-start;gap:8px;margin:0 0 12px}
 .searchbox input{width:100%;padding:9px 12px 9px 36px;border:1px solid var(--field-line);border-radius:12px;background:var(--card);font-size:13.5px}
 .searchbox svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--muted)}
 .fab{position:fixed;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(84px + var(--safe-b));z-index:35;width:54px;height:54px;border-radius:18px;
@@ -5154,6 +5155,16 @@ const DanisanVM={
   aramaYaz(q){DanisanVM.arama=String(q==null?'':q)},
   filtreSec(f){DanisanVM.filtre=f},
 
+  /* Üstteki «Danışan ara» (Gökhan 10-22: her ekrandan ulaşılsın): ada (TR küçük harf) ya da iki telefondan birine göre,
+     durumdan bağımsız; telefonda boşluk/tire yok sayılır (3+ rakam). En çok 8 sonuç, TR sıralı. */
+  hizliAra(q){
+    const s=String(q==null?'':q).trim().toLocaleLowerCase('tr');if(!s)return [];
+    const r=s.replace(/\D/g,''),tel=p=>r.length>=3&&String(p||'').replace(/\D/g,'').includes(r);
+    return Store.col('clients').filter(c=>c.name.toLocaleLowerCase('tr').includes(s)||tel(c.phone)||tel(c.phone2))
+      .sort((a,b)=>a.name.localeCompare(b.name,'tr')).slice(0,8)
+      .map(c=>({id:c.id,ad:c.name,bas:initials(c.name),renk:avColor(c.name),alt:c.phone||c.phone2||''}));
+  },
+
   /* H-C1 + H-C2: süzülmüş danışan satırları + bekleme listesi */
   liste(ctx){
     const q=DanisanVM.arama.toLocaleLowerCase('tr');
@@ -6707,6 +6718,8 @@ const UI={
     const bt=h('div');const b1=h('b');b1.textContent=Store.data.settings.clinicName||'Sena Psikoloji';
     const sm=h('small',{},'Yönetim Paneli');bt.appendChild(b1);bt.appendChild(sm);
     brand.appendChild(bt);sb.appendChild(brand);
+    const araB=h('button.btn.ghost.ara-dugme',{onclick:()=>this.danisanAra()});
+    araB.appendChild(icon('search'));araB.appendChild(document.createTextNode('Danışan ara'));sb.appendChild(araB);
     const nav=h('div.nav');
     NAV.forEach(([v,lbl,ic])=>{
       const b=h('button',{dataset:{v},onclick:()=>this.go(v)});
@@ -6733,6 +6746,8 @@ const UI={
     msm.appendChild(h('span',{id:'mobildurum'})); /* K3.4: eşitleme durumu — Sync.render doldurur/tazeler */
     mtt.appendChild(msm);
     mt.appendChild(mtt);mt.appendChild(h('div.grow'));
+    const araM=h('button.btn.ghost.icon',{onclick:()=>this.danisanAra(),'aria-label':'Danışan ara'});
+    araM.appendChild(icon('search'));mt.appendChild(araM);
     const gearB=h('button.btn.ghost.icon',{onclick:()=>this.go('set'),'aria-label':'Ayarlar'});
     gearB.appendChild(icon('gear'));mt.appendChild(gearB);
 
@@ -6754,6 +6769,32 @@ const UI={
      role=dialog + aria-modal + başlığa bağlı; açılışta odak pencerede, Tab pencere içinde döner, Esc kapatır,
      kapanınca odak açan öğeye döner. Pencerede alan değiştiyse (input/change) arka plana dokunmak KAPATMAZ (Q6).
      opts.sinif: ek sınıf (onay penceresi için 'onay'). */
+  /* her ekrandan danışan arama penceresi (sonuçlar DanisanVM.hizliAra'dan); seçilen danışanın sayfası açılır */
+  danisanAra(){
+    this.modal('Danışan ara',(m,close)=>{
+      const sb=h('div.searchbox',{style:'max-width:none'});sb.appendChild(icon('search'));
+      const inp=h('input',{type:'search',placeholder:'İsim veya telefon…','aria-label':'Danışan ara',autocomplete:'off'});
+      sb.appendChild(inp);m.appendChild(sb);
+      const liste=h('div',{style:'margin-top:10px'});m.appendChild(liste);
+      let sonuc=[];
+      const ac=id=>{close();this.go('clients',id)};
+      const ciz=()=>{
+        sonuc=DanisanVM.hizliAra(inp.value);liste.innerHTML='';
+        if(inp.value.trim()&&!sonuc.length)liste.appendChild(h('div.muted',{style:'padding:10px 4px'},'Eşleşen danışan yok'));
+        sonuc.forEach(s=>{
+          const row=this.tiklanir(h('div.row.click'),()=>ac(s.id));
+          const av=h('div.av');av.style.background=s.renk;av.textContent=s.bas;row.appendChild(av);
+          const tx=h('div');const b=h('b');b.textContent=s.ad;tx.appendChild(b);
+          if(s.alt){const sm=h('small.muted',{style:'display:block'});sm.textContent=s.alt;tx.appendChild(sm)}
+          row.appendChild(tx);liste.appendChild(row);
+        });
+      };
+      /* arama yazmak «değişiklik» sayılmasın: dışarı dokununca pencere kapanabilsin */
+      inp.addEventListener('input',e=>{e.stopPropagation();ciz()});
+      inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&sonuc.length){e.preventDefault();ac(sonuc[0].id)}});
+      setTimeout(()=>inp.focus(),50);
+    });
+  },
   modal(title,build,opts){
     const sinif=(opts&&opts.sinif)?'.'+opts.sinif:'';
     const onceki=document.activeElement;
