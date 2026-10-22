@@ -110,6 +110,7 @@ h1,h2,h3{font-weight:650;letter-spacing:-.01em}
 .mobile-top{display:none}
 @media(max-width:900px){
   #app{flex-direction:column}
+  .hat-dugme span{display:none} /* telefonda yalnız zil: «Danışan ekle» alt satıra düşmesin */
   .sidebar{display:none}
   /* alt boşluk FAB'ın üstünü de kapsar: 84 (alt) + 54 (FAB) + 16 (nefes) + güvenli alan */
   .main{padding:14px max(14px,env(safe-area-inset-right)) calc(84px + 54px + 16px + var(--safe-b)) max(14px,env(safe-area-inset-left))}
@@ -4952,7 +4953,7 @@ const DashVM={
     if(al.client){
       const klinik=Store.data.settings.clinicName;const ilkAd=al.client.name.split(' ')[0];
       if(al.type==='uzak'&&al.client.phone){
-        eylem={tur:'wa-uzak',href:waLink(al.client.phone,'Merhaba '+ilkAd+', nasılsınız? Bir süredir görüşemedik, dilerseniz yeni bir seans planlayabiliriz. 🌿 '+klinik)};
+        eylem={tur:'wa-uzak',href:waLink(al.client.phone,HatirlatmaVM.waMetni(al.client))};
       }else if(al.type==='dogum'&&al.client.phone){
         eylem={tur:'wa-dogum',href:waLink(al.client.phone,'İyi ki doğdunuz '+ilkAd+'! Nice sağlıklı, huzurlu yaşlara 🎂 '+klinik)};
       }else{
@@ -5300,6 +5301,36 @@ const DanisanVM={
       seanslar:{bos:!apps.length,satirlar:seanslar},
       not:c.notes||null
     };
+  }
+};
+/* ==== vm_hatirlatma.js ==== */
+/* Hatırlatmalar (Gökhan 10-22): en az 1 aydır (seçilebilir 1/2/3 ay) seansa gelmeyen, ileri randevusu olmayan danışanlar —
+   aktif ve «ara verdi» olanlar (tamamlananlar değil). Yeni kopan önce (geri kazanması kolay). DOM'suz; Store'u YAZMAZ. */
+const HatirlatmaVM={
+  esik:30,
+  esikSecenekleri:[['30','1 ay'],['60','2 ay'],['90','3 ay']],
+  esikSec(v){HatirlatmaVM.esik=Number(v)||30},
+  /* «Dikkat gerekenler» de aynı metni kullanır */
+  waMetni(c){return 'Merhaba '+c.name.split(' ')[0]+', nasılsınız? Bir süredir görüşemedik, dilerseniz yeni bir seans planlayabiliriz. 🌿 '+Store.data.settings.clinicName},
+  liste(ctx){
+    const t=(ctx&&ctx.bugun)||todayStr();const esik=HatirlatmaVM.esik;
+    const satirlar=[];
+    for(const c of Store.col('clients')){
+      if(c.status!=='aktif'&&c.status!=='pasif')continue;
+      const st=Store.clientStats(c.id);
+      if(st.sonraki)continue;
+      const baz=st.son?st.son.date:String(c.createdAt||'').slice(0,10);
+      if(!baz)continue;
+      const gun=daysBetween(baz,t);
+      if(gun<esik)continue;
+      satirlar.push({id:c.id,ad:c.name,bas:initials(c.name),renk:avColor(c.name),gun,
+        aciklama:st.son?'Son seans '+fmtD(st.son.date)+' · '+gun+' gün önce':'Hiç seansa gelmedi · '+gun+' gündür kayıtlı',
+        araVerdi:c.status==='pasif',telefon:c.phone||null,
+        waHref:c.phone?waLink(c.phone,HatirlatmaVM.waMetni(c)):null});
+    }
+    satirlar.sort((a,b)=>a.gun-b.gun||a.ad.localeCompare(b.ad,'tr'));
+    return {esik:String(esik),esikSecenekleri:HatirlatmaVM.esikSecenekleri,satirlar,bos:!satirlar.length,
+      sayac:satirlar.length?satirlar.length+' danışan':''};
   }
 };
 /* ==== vm_finans.js ==== */
@@ -6738,7 +6769,7 @@ const UI={
   },
 
   shell(){
-    const NAV=[['dash','Ana Ekran','home'],['cal','Randevular','cal'],['clients','Danışanlar','users'],
+    const NAV=[['dash','Ana Ekran','home'],['cal','Randevular','cal'],['clients','Danışanlar','users'],['hatir','Hatırlatmalar','bell'],
       ['fin','Finans','wallet'],['rep','Raporlar','chart'],['set','Ayarlar','gear']];
     const sb=$('#sidebar');sb.innerHTML='';
     const brand=h('div.brand');
@@ -6781,7 +6812,7 @@ const UI={
 
     /* mobil sekmeler */
     const tb=$('#tabbar');tb.innerHTML='';
-    NAV.slice(0,5).forEach(([v,lbl,ic])=>{
+    NAV.filter(([v])=>v!=='hatir'&&v!=='set').forEach( /* telefonda Hatırlatmalar: Danışanlar ve Ana Ekran'daki bağlantıdan */([v,lbl,ic])=>{
       const b=h('button',{dataset:{v},onclick:()=>this.go(v)});
       b.appendChild(icon(ic));b.appendChild(h('span',{},lbl.split(' ')[0]));
       tb.appendChild(b);
@@ -7453,6 +7484,8 @@ UI.register('dash',main=>{
   const ah=h('h3');ah.appendChild(icon('bell'));ah.appendChild(document.createTextNode('Dikkat gerekenler'));
   const ahint=h('span.hint');ahint.textContent=v.uyarilar.ipucu;ah.appendChild(ahint);
   ac.appendChild(ah);
+  const hatB=h('button.btn.ghost.sm',{onclick:()=>UI.go('hatir'),style:'margin:-4px 0 10px'});
+  hatB.appendChild(icon('bell'));hatB.appendChild(document.createTextNode('Uzun süredir gelmeyenler →'));ac.appendChild(hatB);
   if(!v.uyarilar.sayi){
     const e=h('div.empty');e.appendChild(icon('heart'));e.appendChild(h('div',{},'Şu an dikkat gerektiren bir şey yok'));ac.appendChild(e);
   }
@@ -7627,6 +7660,8 @@ UI.register('clients',(main,param)=>{
   const top=h('div.topbar');
   const h1=h('h1');h1.textContent='Danışanlar';top.appendChild(h1);
   top.appendChild(h('div.grow'));
+  const hat=h('button.btn.ghost.hat-dugme',{onclick:()=>UI.go('hatir'),'aria-label':'Hatırlatmalar'});hat.appendChild(icon('bell'));hat.appendChild(h('span',{},'Hatırlatmalar'));
+  top.appendChild(hat);
   const add=h('button.btn',{onclick:()=>Forms.client()});
   add.appendChild(icon('plus'));add.appendChild(document.createTextNode(FormVM.ADLAR.danisanEkle));
   top.appendChild(add);
@@ -7808,6 +7843,37 @@ function clientDetail(main,id){
   const del=h('button.btn.danger.sm',{onclick:()=>UI.confirm(t.silOnayi,()=>{const r=Islem.danisanSil(id);UI.go('clients');UI.toast(r.mesaj,'ok')})},'Danışanı sil');
   danger.appendChild(del);main.appendChild(danger);
 }
+/* ==== ekran_hatirlatma.js ==== */
+/* Hatırlatmalar — uzun süredir gelmeyenler (hesap HatirlatmaVM'de; burada çizim ve olay bağlama) */
+UI.register('hatir',main=>{
+  const top=h('div.topbar');
+  const h1=h('h1');h1.textContent='Hatırlatmalar';top.appendChild(h1);
+  main.appendChild(top);
+  const ilk=HatirlatmaVM.liste();
+  const bar=h('div.flex.mb',{style:'flex-wrap:wrap;align-items:center'});
+  bar.appendChild(h('span.small.muted',{},'En az şu kadardır gelmeyenler:'));
+  bar.appendChild(UI.seg(ilk.esikSecenekleri,ilk.esik,v=>{HatirlatmaVM.esikSec(v);ciz()}));
+  main.appendChild(bar);
+  const kart=h('div.card');main.appendChild(kart);
+  function ciz(){
+    kart.innerHTML='';
+    const l=HatirlatmaVM.liste();
+    if(l.bos){const e=h('div.empty');e.appendChild(icon('heart'));e.appendChild(h('div',{},'Bu süreyi aşan danışan yok'));kart.appendChild(e);return}
+    const hint=h('div.small.muted.mb');hint.textContent=l.sayac+' · yeni kopanlar önce';kart.appendChild(hint);
+    l.satirlar.forEach(s=>{
+      const row=UI.tiklanir(h('div.row.click'),()=>UI.go('clients',s.id));
+      const av=h('div.av');av.style.background=s.renk;av.textContent=s.bas;
+      const bd=h('div.body');const b=h('b');b.textContent=s.ad;bd.appendChild(b);
+      const sm=h('small');sm.textContent=s.aciklama;bd.appendChild(sm);
+      const end=h('div.end',{style:'display:flex;gap:6px;align-items:center'});
+      if(s.araVerdi){const ch=h('span.chip.gray');ch.textContent='Ara verdi';end.appendChild(ch)}
+      if(s.waHref){const wa=h('a.btn.soft.sm',{href:s.waHref,target:'_blank',onclick:e=>e.stopPropagation(),'aria-label':'WhatsApp – '+s.ad});
+        wa.appendChild(icon('wa'));end.appendChild(wa)}
+      row.appendChild(av);row.appendChild(bd);row.appendChild(end);kart.appendChild(row);
+    });
+  }
+  ciz();
+});
 /* ==== view_finance.js ==== */
 /* Finans — iş geliri, ofis giderleri, kişisel (hesaplar FinansVM'de; burada yalnız çizim ve olay bağlama) */
 function openMuhasebe(mk){
