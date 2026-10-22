@@ -373,6 +373,10 @@ table.data tr:last-child td{border-bottom:none}
 .pos{color:var(--good)}.neg{color:var(--crit)}
 .hide{display:none!important}
 .searchbox{position:relative;flex:1;max-width:320px}
+.rozet{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--crit);color:#fff;font-size:11px;font-weight:700;line-height:18px;text-align:center}
+.nav button .rozet{margin-left:auto}
+.tabbar button{position:relative}
+.tabbar button .rozet{position:absolute;top:1px;left:calc(50% + 6px)}
 .ara-dugme{width:100%;justify-content:flex-start;gap:8px;margin:0 0 12px}
 .searchbox input{width:100%;padding:9px 12px 9px 36px;border:1px solid var(--field-line);border-radius:12px;background:var(--card);font-size:13.5px}
 .searchbox svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--muted)}
@@ -3325,6 +3329,7 @@ const LS={ // localStorage anahtarları (cihaza özel)
   etag:'sena.etag',    // son bilinen ETag (If-None-Match için)
   dirty:'sena.dirty',  // '1' = gönderilmemiş yerel değişiklik var (kapanıp açılınca kaybolmasın)
   tema:'sena.tema',    // görünüm: 'duz' | '3b' | '3b-ust-menu' (E3; cihaz başına, EŞİTLENMEZ)
+  gorulen:'sena.gorulen', // menü rozetleri: ekran → son bakış zamanı (Degisim)
   davetBitti:'sena.davetBitti' // bu cihazda biten davetlerin ÖZETLERİ (virgüllü; davetin kendisi saklanmaz)
 };
 
@@ -3744,6 +3749,23 @@ const Tema={
   },
   /* seçim: kaydet + hemen uygula. Dönen: uygulanan tema adı */
   sec(ad,belge){return this.uygula(this.yaz(ad),belge)}
+};
+/* ==== degisim.js ==== */
+/* Menü rozetleri (Gökhan 10-22): ÖBÜR kullanıcının (Sena↔Ketty) bu cihazda o ekran son açıldığından beri eklediği /
+   değiştirdiği / sildiği kayıt sayısı. Kendi değişikliğin sayılmaz; ekranı açınca sıfırlanır. «Son bakış» cihaza özeldir
+   (localStorage). İlk kez sorulan ekran «şimdi görüldü» sayılır — eski kayıtların hepsi rozet olmasın. */
+const Degisim={
+  EKRAN:{cal:['appointments'],clients:['clients','adjustments','waitlist'],fin:['payments','transactions','recurring','packages','packageSales']},
+  oku(){try{return JSON.parse(localStorage.getItem(LS.gorulen)||'{}')||{}}catch(e){return {}}},
+  yaz(o){try{localStorage.setItem(LS.gorulen,JSON.stringify(o))}catch(e){}},
+  gordum(ekran){if(!this.EKRAN[ekran])return;const o=this.oku();o[ekran]=nowIso();this.yaz(o)},
+  sayi(ekran){
+    const kol=this.EKRAN[ekran];if(!kol||!Store.data)return 0;
+    const g=this.oku()[ekran];if(!g){this.gordum(ekran);return 0}
+    let n=0;
+    for(const c of kol)for(const r of (Store.data[c]||[]))if(r.updatedBy&&r.updatedBy!==Store.user&&String(r.updatedAt||'')>g)n++;
+    return n;
+  }
 };
 /* ==== gizlilik.js ==== */
 /* Görünürlük politikası — TEK nokta (KUL2, Gökhan 10-14): Sena'nın kişisel harcamalarını kim görür?
@@ -6682,7 +6704,7 @@ const UI={
     const damga=Store.data&&Store.data.settingsUpdatedAt;
     if(damga!==this.ayarDamgasi){this.ayarDamgasi=damga;this.shell()}
     if(this.taslakVar()){
-      this.bekleyenCizim=true;
+      this.bekleyenCizim=true;this.navIsaretle(); /* çizim ertelense de menü rozetleri tazelensin */
       if(!this.taslakBildirildi){this.taslakBildirildi=true;this.toast('Yeni veri geldi — kaydedince ekran yenilenecek')}
       return;
     }
@@ -6693,6 +6715,7 @@ const UI={
     this.bekleyenCizim=false;this.taslakBildirildi=false;
     const main=$('#main');main.innerHTML='';
     (this.views[this.view]||this.views.dash)(main,this.param);
+    Degisim.gordum(this.view);
     this.navIsaretle();
     /* K3.11: YALNIZ ekran (view/param) değişince başa kaydır; kayıt/eşitleme sonrası aynı ekranın yeniden çizimi yerinde bırakır */
     const yeni=!this.sonEkran||this.sonEkran.view!==this.view||this.sonEkran.param!==this.param;
@@ -6704,7 +6727,12 @@ const UI={
   /* yan menü / tabbar'da aktif ekranın düğmesini işaretle (render ve shell kullanır) */
   navIsaretle(){
     const isle=b=>{const on=b.dataset.v===this.view;b.classList.toggle('on',on);
-      if(on)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')};
+      if(on)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');
+      /* rozet: öbür kullanıcının bu ekrandaki yeni değişiklik sayısı (Degisim) */
+      const n=Degisim.sayi(b.dataset.v);let r=b.querySelector('.rozet');
+      if(!n){if(r)r.remove();return}
+      if(!r){r=h('span.rozet');b.appendChild(r)}
+      r.textContent=n>99?'99+':String(n);r.setAttribute('aria-label',n+' yeni değişiklik')};
     $$('.nav button[data-v]').forEach(isle);
     $$('.tabbar button[data-v]').forEach(isle);
   },
