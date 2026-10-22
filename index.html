@@ -4139,10 +4139,10 @@ const Kurulum={
 const Islem={
 
   /* ---------- danışan (V-F1) ---------- */
-  /* g: {name,phone,fee,birthDate,source,status,notes} · mevcutId: düzenlenen danışanın id'si (yoksa yeni) */
+  /* g: {name,phone,phone2,fee,birthDate,source,status,notes} (phone2: isteğe bağlı ikinci numara — Sena 10-22) · mevcutId: düzenlenen danışanın id'si (yoksa yeni) */
   danisanKaydet(g,mevcutId){
     if(!(g.name||'').trim())return {ok:false,hata:'Ad soyad gerekli',alan:'name'};
-    const rec={name:g.name.trim(),phone:(g.phone||'').trim(),fee:Number(g.fee)||0,
+    const rec={name:g.name.trim(),phone:(g.phone||'').trim(),phone2:(g.phone2||'').trim(),fee:Number(g.fee)||0,
       birthDate:g.birthDate,source:g.source,status:g.status,notes:g.notes};
     const kayit=mevcutId?Store.update('clients',mevcutId,rec):Store.add('clients',rec);
     return {ok:true,mesaj:mevcutId?'Danışan güncellendi':'Danışan eklendi',kayit};
@@ -5161,7 +5161,7 @@ const DanisanVM={
     /* Q9: 'borclu' = kalan bakiyesi > 0 olanlar, durumdan BAĞIMSIZ (tamamlanmış danışanın açık borcu da görünür) */
     const uygun=c=>f==='hepsi'||(f==='borclu'?Store.balance(c.id).kalan>0:c.status===f);
     const list=Store.col('clients').filter(c=>uygun(c)&&
-      (!q||c.name.toLocaleLowerCase('tr').includes(q)||(c.phone||'').includes(q)));
+      (!q||c.name.toLocaleLowerCase('tr').includes(q)||(c.phone||'').includes(q)||(c.phone2||'').includes(q)));
     list.sort((a,b)=>a.name.localeCompare(b.name,'tr'));
     const satirlar=list.map(c=>{
       const st=Store.clientStats(c.id);const b=Store.balance(c.id);
@@ -5258,6 +5258,8 @@ const DanisanVM={
       durum,kaynak:c.source||null,
       telefon:c.phone||null,
       waLink:c.phone?waLink(c.phone,'Merhaba '+c.name.split(' ')[0]+', '):null,
+      telefon2:c.phone2||null,
+      waLink2:c.phone2?waLink(c.phone2,'Merhaba '+c.name.split(' ')[0]+', '):null,
       odemeOnerisi:b.kalan>0?b.kalan:'',
       silOnayi:DanisanVM.silOnayi(id),
       aktifPaket,istatistik,
@@ -5883,9 +5885,9 @@ const AyarVM={
   /* H-S2 */
   danisanCsv(ctx){
     const t=(ctx&&ctx.bugun)||todayStr();
-    const rows=[['Danışan','Telefon','Durum','Toplam seans','Gelmedi','Son seans','Açık bakiye']];
+    const rows=[['Danışan','Telefon','Telefon 2','Durum','Toplam seans','Gelmedi','Son seans','Açık bakiye']];
     Store.col('clients').forEach(c=>{const st2=Store.clientStats(c.id);const b=Store.balance(c.id);
-      rows.push([c.name,c.phone||'',c.status,st2.toplam,st2.noshow,st2.son?st2.son.date:'',b.kalan])});
+      rows.push([c.name,c.phone||'',c.phone2||'',c.status,st2.toplam,st2.noshow,st2.son?st2.son.date:'',b.kalan])});
     return {dosyaAdi:'sena-danisanlar-'+t+'.csv',icerik:this.csvMetni(rows),mime:'text/csv;charset=utf-8'};
   },
 
@@ -6926,6 +6928,7 @@ const Forms={
     UI.modal(existing?'Danışanı düzenle':FormVM.ADLAR.danisanEkle,(m,close)=>{
       const name=UI.input({value:c.name||'',placeholder:'Ad Soyad'});
       const phone=UI.input({value:c.phone||'',placeholder:'05xx xxx xx xx',type:'tel'});
+      const phone2=UI.input({value:c.phone2||'',placeholder:'İsteğe bağlı',type:'tel'});
       const fee=UI.input({value:c.fee!=null?c.fee:Store.data.settings.defaultFee,type:'number',inputmode:'numeric'});
       const birth=UI.input({value:c.birthDate||'',type:'date'});
       const source=UI.select(['','Tavsiye','Instagram','Google','Web sitesi','Kurum','Diğer'].map(x=>[x,x||'—']),c.source||'');
@@ -6936,6 +6939,7 @@ const Forms={
       fr.appendChild(UI.field('Telefon',phone));
       fr.appendChild(UI.field('Seans ücreti (₺)',fee));
       m.appendChild(fr);
+      m.appendChild(UI.field('2. telefon',phone2));
       const fr2=h('div.frow');
       fr2.appendChild(UI.field('Doğum tarihi',birth));
       fr2.appendChild(UI.field('Nereden geldi?',source));
@@ -6945,7 +6949,7 @@ const Forms={
       const acts=h('div.actions');
       acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
       acts.appendChild(h('button.btn',{onclick:()=>{
-        const r=Islem.danisanKaydet({name:name.value,phone:phone.value,fee:fee.value,
+        const r=Islem.danisanKaydet({name:name.value,phone:phone.value,phone2:phone2.value,fee:fee.value,
           birthDate:birth.value,source:source.value,status:status.dataset.value,notes:notes.value},existing&&existing.id);
         if(!r.ok)return UI.formHatasi(m,r,{name});
         close();UI.toast(r.mesaj,'ok');
@@ -7646,6 +7650,13 @@ function clientDetail(main,id){
     const wa=h('a.btn.soft.sm',{href:t.waLink,target:'_blank'});
     wa.appendChild(icon('wa'));wa.appendChild(document.createTextNode('WhatsApp'));
     acts.appendChild(wa);
+  }
+  if(t.telefon2){
+    const call2=h('a.btn.ghost.sm',{href:'tel:'+t.telefon2});call2.appendChild(icon('phone'));call2.appendChild(document.createTextNode(t.telefon2));
+    acts.appendChild(call2);
+    const wa2=h('a.btn.soft.sm',{href:t.waLink2,target:'_blank','aria-label':'WhatsApp – '+t.telefon2});
+    wa2.appendChild(icon('wa'));wa2.appendChild(document.createTextNode('WhatsApp'));
+    acts.appendChild(wa2);
   }
   const nr=h('button.btn.sm',{onclick:()=>Forms.appointment(null,{clientId:id,fee:c.fee})});
   nr.appendChild(icon('plus'));nr.appendChild(document.createTextNode(FormVM.ADLAR.randevuEkle));acts.appendChild(nr);
