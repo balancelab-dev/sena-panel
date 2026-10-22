@@ -110,6 +110,8 @@ h1,h2,h3{font-weight:650;letter-spacing:-.01em}
 .mobile-top{display:none}
 @media(max-width:900px){
   #app{flex-direction:column}
+  .hat-satir{flex-wrap:wrap}
+  .hat-satir .end{flex:1 0 100%;justify-content:flex-end} /* telefonda düğmeler ismin altına: ad kesilmesin */
   .hat-dugme span{display:none} /* telefonda yalnız zil: «Danışan ekle» alt satıra düşmesin */
   .sidebar{display:none}
   /* alt boşluk FAB'ın üstünü de kapsar: 84 (alt) + 54 (FAB) + 16 (nefes) + güvenli alan */
@@ -4163,6 +4165,12 @@ const Kurulum={
 const Islem={
 
   /* ---------- danışan (V-F1) ---------- */
+  /* Hatırlatmalar > «Ulaşıldı» (Gökhan 10-22): kim, hangi gün ulaştı — iki kişi aynı danışana yazmasın; eşitlenir */
+  ulasildiIsaretle(id,bugun){
+    if(!Store.find('clients',id))return {ok:false,hata:'Danışan bulunamadı'};
+    Store.update('clients',id,{ulasildi:{tarih:bugun||todayStr(),kim:Store.user}});
+    return {ok:true,mesaj:'Ulaşıldı olarak işaretlendi'};
+  },
   /* g: {name,phone,phone2,fee,birthDate,source,status,notes} (phone2: isteğe bağlı ikinci numara — Sena 10-22) · mevcutId: düzenlenen danışanın id'si (yoksa yeni) */
   danisanKaydet(g,mevcutId){
     if(!(g.name||'').trim())return {ok:false,hata:'Ad soyad gerekli',alan:'name'};
@@ -5305,16 +5313,18 @@ const DanisanVM={
 };
 /* ==== vm_hatirlatma.js ==== */
 /* Hatırlatmalar (Gökhan 10-22): en az 1 aydır (seçilebilir 1/2/3 ay) seansa gelmeyen, ileri randevusu olmayan danışanlar —
-   aktif ve «ara verdi» olanlar (tamamlananlar değil). Yeni kopan önce (geri kazanması kolay). DOM'suz; Store'u YAZMAZ. */
+   aktif ve «ara verdi» olanlar (tamamlananlar değil). Yeni kopan önce (geri kazanması kolay). DOM'suz; Store'u YAZMAZ.
+   «Ulaşıldı» işaretli olan ULASILDI_GUN gün boyunca alttaki «Ulaşılanlar» bölümüne iner (kim, hangi gün). */
 const HatirlatmaVM={
   esik:30,
+  ULASILDI_GUN:14,
   esikSecenekleri:[['30','1 ay'],['60','2 ay'],['90','3 ay']],
   esikSec(v){HatirlatmaVM.esik=Number(v)||30},
   /* «Dikkat gerekenler» de aynı metni kullanır */
   waMetni(c){return 'Merhaba '+c.name.split(' ')[0]+', nasılsınız? Bir süredir görüşemedik, dilerseniz yeni bir seans planlayabiliriz. 🌿 '+Store.data.settings.clinicName},
   liste(ctx){
     const t=(ctx&&ctx.bugun)||todayStr();const esik=HatirlatmaVM.esik;
-    const satirlar=[];
+    const satirlar=[],ulasilanlar=[];
     for(const c of Store.col('clients')){
       if(c.status!=='aktif'&&c.status!=='pasif')continue;
       const st=Store.clientStats(c.id);
@@ -5323,13 +5333,16 @@ const HatirlatmaVM={
       if(!baz)continue;
       const gun=daysBetween(baz,t);
       if(gun<esik)continue;
-      satirlar.push({id:c.id,ad:c.name,bas:initials(c.name),renk:avColor(c.name),gun,
+      const u=c.ulasildi&&c.ulasildi.tarih&&daysBetween(c.ulasildi.tarih,t)<HatirlatmaVM.ULASILDI_GUN?c.ulasildi:null;
+      (u?ulasilanlar:satirlar).push({id:c.id,ad:c.name,bas:initials(c.name),renk:avColor(c.name),gun,
         aciklama:st.son?'Son seans '+fmtD(st.son.date)+' · '+gun+' gün önce':'Hiç seansa gelmedi · '+gun+' gündür kayıtlı',
         araVerdi:c.status==='pasif',telefon:c.phone||null,
-        waHref:c.phone?waLink(c.phone,HatirlatmaVM.waMetni(c)):null});
+        waHref:c.phone?waLink(c.phone,HatirlatmaVM.waMetni(c)):null,
+        ulasildi:u?fmtD(u.tarih)+(u.kim?' · '+u.kim+' ulaştı':' ulaşıldı'):null,uTarih:u?u.tarih:''});
     }
     satirlar.sort((a,b)=>a.gun-b.gun||a.ad.localeCompare(b.ad,'tr'));
-    return {esik:String(esik),esikSecenekleri:HatirlatmaVM.esikSecenekleri,satirlar,bos:!satirlar.length,
+    ulasilanlar.sort((a,b)=>a.uTarih<b.uTarih?1:a.uTarih>b.uTarih?-1:a.ad.localeCompare(b.ad,'tr'));
+    return {esik:String(esik),esikSecenekleri:HatirlatmaVM.esikSecenekleri,satirlar,ulasilanlar,bos:!satirlar.length&&!ulasilanlar.length,
       sayac:satirlar.length?satirlar.length+' danışan':''};
   }
 };
@@ -7859,9 +7872,9 @@ UI.register('hatir',main=>{
     kart.innerHTML='';
     const l=HatirlatmaVM.liste();
     if(l.bos){const e=h('div.empty');e.appendChild(icon('heart'));e.appendChild(h('div',{},'Bu süreyi aşan danışan yok'));kart.appendChild(e);return}
-    const hint=h('div.small.muted.mb');hint.textContent=l.sayac+' · yeni kopanlar önce';kart.appendChild(hint);
-    l.satirlar.forEach(s=>{
-      const row=UI.tiklanir(h('div.row.click'),()=>UI.go('clients',s.id));
+    if(l.satirlar.length){const hint=h('div.small.muted.mb');hint.textContent=l.sayac+' · yeni kopanlar önce';kart.appendChild(hint)}
+    const satir=s=>{
+      const row=UI.tiklanir(h('div.row.click.hat-satir'),()=>UI.go('clients',s.id));
       const av=h('div.av');av.style.background=s.renk;av.textContent=s.bas;
       const bd=h('div.body');const b=h('b');b.textContent=s.ad;bd.appendChild(b);
       const sm=h('small');sm.textContent=s.aciklama;bd.appendChild(sm);
@@ -7869,8 +7882,16 @@ UI.register('hatir',main=>{
       if(s.araVerdi){const ch=h('span.chip.gray');ch.textContent='Ara verdi';end.appendChild(ch)}
       if(s.waHref){const wa=h('a.btn.soft.sm',{href:s.waHref,target:'_blank',onclick:e=>e.stopPropagation(),'aria-label':'WhatsApp – '+s.ad});
         wa.appendChild(icon('wa'));end.appendChild(wa)}
+      if(!s.ulasildi)end.appendChild(h('button.btn.ghost.sm',{onclick:e=>{e.stopPropagation();
+        const r=Islem.ulasildiIsaretle(s.id);UI.toast(r.mesaj,r.ok?'ok':'err');ciz()}},'Ulaşıldı'));
+      else{const uc=h('span.chip.good');uc.textContent=s.ulasildi;end.appendChild(uc)}
       row.appendChild(av);row.appendChild(bd);row.appendChild(end);kart.appendChild(row);
-    });
+    };
+    l.satirlar.forEach(satir);
+    if(l.ulasilanlar.length){
+      const uh=h('div.small.muted',{style:'margin:16px 0 6px'});uh.textContent='Ulaşılanlar · '+HatirlatmaVM.ULASILDI_GUN+' gün sonra listeye döner';kart.appendChild(uh);
+      l.ulasilanlar.forEach(satir);
+    }
   }
   ciz();
 });
