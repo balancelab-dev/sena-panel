@@ -3322,7 +3322,8 @@ const LS={ // localStorage anahtarları (cihaza özel)
   sha:'sena.sha',      // son bilinen GitHub sha
   etag:'sena.etag',    // son bilinen ETag (If-None-Match için)
   dirty:'sena.dirty',  // '1' = gönderilmemiş yerel değişiklik var (kapanıp açılınca kaybolmasın)
-  tema:'sena.tema'     // görünüm: 'duz' | '3b' | '3b-ust-menu' (E3; cihaz başına, EŞİTLENMEZ)
+  tema:'sena.tema',    // görünüm: 'duz' | '3b' | '3b-ust-menu' (E3; cihaz başına, EŞİTLENMEZ)
+  davetBitti:'sena.davetBitti' // bu cihazda biten davetlerin ÖZETLERİ (virgüllü; davetin kendisi saklanmaz)
 };
 
 /* kayıt koleksiyonları (birleştirme + değişiklik özeti bu listeyi kullanır) */
@@ -4092,6 +4093,25 @@ const Kurulum={
     const ham=h.slice(this.DAVET_ONEK.length);
     if(!ham)return null;
     try{return decodeURIComponent(ham)}catch(e){return null}
+  },
+
+  /* Biten davet (masa 10-22): iPhone ana ekran simgesi açılış adresini '#davet=…' ile saklar → her açılışta davet sorulmasın.
+     Kabul edilen davet (ve kurulu cihazda geçilen davet) bu cihazda «bitti» sayılır; yeni bir davet yine sorulur. */
+  /* davet parçası → kısa özet (FNV-1a 32 bit, onaltılık; saf) */
+  davetOzeti(parca){
+    let h=0x811c9dc5;
+    for(const c of String(parca)){h^=c.charCodeAt(0);h=Math.imul(h,0x01000193)>>>0}
+    return h.toString(16);
+  },
+  davetBittiMi(parca){
+    try{return (localStorage.getItem(LS.davetBitti)||'').split(',').includes(this.davetOzeti(parca))}catch(e){return false}
+  },
+  davetBittiIsaretle(parca){
+    try{
+      const l=(localStorage.getItem(LS.davetBitti)||'').split(',').filter(Boolean),o=this.davetOzeti(parca);
+      if(!l.includes(o))l.push(o);
+      localStorage.setItem(LS.davetBitti,l.slice(-20).join(','));
+    }catch(e){}
   },
 
   /* file:// ya da localhost'ta üretilen adres başka cihazda açılmaz (saf) */
@@ -8369,10 +8389,10 @@ const App={
     UI.kur(); /* Esc / Tab döngüsü / geri tuşu dinleyicileri + bildirim bölgesi (K2) */
     Sync.init();
     Store.onChange(()=>{ if($('#app').classList.contains('ready')) UI.veriDegisti() });
-    this.davet=Kurulum.davetParcasi(location.hash); /* davet bağlantısı (D3a) ya da null: kayıtlı kullanıcı olsa bile ÖNCE davet sorulur */
+    this.davet=this.davetAl(); /* davet bağlantısı (D3a) ya da null: kayıtlı kullanıcı olsa bile ÖNCE davet sorulur (bu cihazda bitmiş davet hariç) */
     /* panel bir sekmede AÇIKKEN davet bağlantısı aynı sekmede açılırsa sayfa yeniden yüklenmez (yalnız #parça değişir) — masa 10-14 */
     window.addEventListener('hashchange',()=>{
-      const d=Kurulum.davetParcasi(location.hash);
+      const d=this.davetAl();
       if(d&&d!==this.davet){this.davet=d;this.gateDavet()}
     });
     if(this.davet)return this.gateDavet();
@@ -8652,11 +8672,18 @@ const App={
 
   /* ---- davet kabulü (#davet=) ---- */
   davet:null, /* şifreli '#davet=' parçası; kabul / vazgeç ile null */
+  /* adresteki davet; bu cihazda bitmişse adres temizlenir ve null (iPhone ana ekran simgesi — masa 10-22) */
+  davetAl(){
+    const d=Kurulum.davetParcasi(location.hash);
+    if(d&&Kurulum.davetBittiMi(d)){history.replaceState(null,'',location.pathname+location.search);return null}
+    return d;
+  },
   davetTemizle(){
     history.replaceState(null,'',location.pathname+location.search);
     this.davet=null;
   },
   davetVazgec(){
+    if(localStorage.getItem(LS.cache))Kurulum.davetBittiIsaretle(this.davet); /* kurulu cihazda geçilen davet bir daha sorulmaz; boş cihazda sorulur */
     this.davetTemizle();
     return this.acilis();
   },
@@ -8674,6 +8701,7 @@ const App={
     this.formEkrani(d,async v=>{
       const r=await Islem.davetKabul(this.davet,kod,{parola:v.parola,tekrar:v.tekrar});
       if(!r.ok)return r;
+      Kurulum.davetBittiIsaretle(this.davet);
       this.davetTemizle();
       await this.girisBitir(null,r.mesaj);
       return {ok:true};
