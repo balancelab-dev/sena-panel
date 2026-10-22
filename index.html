@@ -524,9 +524,10 @@ select:disabled{opacity:.45}
   .akis-grup:not(.acik) .akis-kat:nth-child(n+4){display:none}
 }
 @media(min-width:1280px){.akis-govde{grid-template-columns:minmax(0,1fr) 300px;align-items:start}.akis-diyagram{align-self:center}}
+/* iPad dik (700–900 px, Gökhan 10-22): büyük Para Haritası + KPI şeridi görünür, dikey mini akış gizlenir; telefonda mini akış */
+@media(max-width:699px){.akis-masa{display:none}.akis-kpi{display:none}}
+@media(min-width:700px) and (max-width:900px){.akis-tel{display:none}}
 @media(max-width:900px){
-  .akis-masa{display:none}
-  .akis-kpi{display:none}
   .akis{padding:16px 14px}
   .card h3.akis-baslik{font-size:22px}
   .akis-cumle{font-size:15px;margin-top:12px}
