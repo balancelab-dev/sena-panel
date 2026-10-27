@@ -219,6 +219,10 @@ h3 svg,h2 svg,summary svg{width:17px;height:17px;flex:0 0 17px;color:var(--brand
 .field textarea{min-height:70px;resize:vertical}
 .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 2px var(--brand)}
 .field .help{font-size:11.5px;color:var(--muted);margin-top:4px}
+/* «Ücretsiz seans» kutucuğu (randevu formu) — dokunma alanı ≥44px */
+.chk{display:flex;align-items:center;gap:10px;min-height:44px;margin:-6px 0 8px;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer}
+.chk input{width:20px;height:20px;accent-color:var(--brand);margin:0}
+.field input:disabled{opacity:.5}
 .frow{display:flex;gap:10px}.frow>.field{flex:1;min-width:0}
 .seg{display:inline-flex;background:var(--bg-2);border-radius:11px;padding:3px;gap:2px;flex-wrap:wrap}
 .seg button{padding:6px 13px;border-radius:9px;font-size:12.5px;font-weight:600;color:var(--ink-2)}
@@ -2974,6 +2978,8 @@ function money(n,compact){
   if(compact&&Math.abs(n)>=100000)return (n/1000).toLocaleString('tr-TR',{maximumFractionDigits:0})+' bin ₺'; /* «B» bin mi milyar mı belirsizdi (masa 10-14) */
   return n.toLocaleString('tr-TR',{maximumFractionDigits:0})+' ₺';
 }
+/* seans ücreti metni: bilerek ücretsiz işaretlenen seans «Ücretsiz» yazar (Sena 10-27) */
+const seansUcreti=a=>a.ucretsiz?'Ücretsiz':money(a.fee);
 const num=n=>(Number(n)||0).toLocaleString('tr-TR');
 
 /* Tarih */
@@ -3608,9 +3614,9 @@ const Store={
     for(const s of sales)if(this.saleUsage(s).remaining>0)return s;
     return null;
   },
-  /* "geldi" işaretlenen seansı varsa aktif paketten düş */
+  /* "geldi" işaretlenen seansı varsa aktif paketten düş (ücretsiz seans düşmez — Sena 10-27) */
   applyPackage(a){
-    if(!a||a.packageSaleId)return null;
+    if(!a||a.packageSaleId||a.ucretsiz)return null;
     const sale=this.activeSale(a.clientId);
     if(!sale)return null;
     const u=this.saleUsage(sale).used;
@@ -4182,7 +4188,8 @@ const Islem={
   },
 
   /* ---------- randevu (V-F2, V-F3, V-F4, V-F5) ---------- */
-  /* g: {clientId,date,time,fee,note,status, tekrar,tekrarSayisi, yeniDanisan}
+  /* g: {clientId,date,time,fee,note,status, tekrar,tekrarSayisi, yeniDanisan, ucretsiz}
+     ucretsiz: true → ücret 0 + kayıtta ucretsiz:true (bilerek ücretsiz; paketten düşmez — Sena 10-27)
      yeniDanisan: null | {name,phone} ("Listede yok mu?" kutusu açıkken) · tekrar/tekrarSayisi yalnız yeni randevuda okunur */
   randevuKaydet(g,mevcutId){
     const S=Store.data.settings;
@@ -4196,8 +4203,9 @@ const Islem={
         cid=yeniDanisan.id;
       }
       const c=Store.find('clients',cid);
-      const f=g.fee!==''?Number(g.fee):(c.fee||S.defaultFee);
-      const base={clientId:cid,date:g.date,time:g.time,fee:f,note:g.note,status:g.status};
+      const f=g.ucretsiz?0:g.fee!==''?Number(g.fee):(c.fee||S.defaultFee);
+      const base={clientId:cid,date:g.date,time:g.time,fee:f,ucretsiz:!!g.ucretsiz,note:g.note,status:g.status};
+      if(g.ucretsiz)base.packageSaleId=null; /* önceden paketten düşmüşse paketi geri ver */
       if(mevcutId){Store.update('appointments',mevcutId,base);savedRec=Store.find('appointments',mevcutId);kayitlar.push(savedRec)}
       else{
         const every=Number(g.tekrar);
@@ -4255,6 +4263,7 @@ const Islem={
     const sale=Store.applyPackage(Store.find('appointments',id));
     const kayit=Store.find('appointments',id);
     if(sale)return {ok:true,mesaj:'Seans paketten düşüldü — '+sale.name+': kalan '+Store.saleUsage(sale).remaining,paket:sale,kayit};
+    if(kayit.ucretsiz)return {ok:true,mesaj:'Ücretsiz seans işlendi',paket:null,kayit};
     return {ok:true,mesaj:'Seans işlendi — '+money(kayit.fee)+' borca yazıldı',paket:null,kayit};
   },
 
@@ -4281,6 +4290,16 @@ const Islem={
     if(!v||v<=0)return {ok:false,hata:'Geçerli bir tutar girin',alan:'amount'};
     const kayit=Store.add('payments',{clientId:g.clientId,amount:v,date:g.date,method:g.method,note:g.note});
     return {ok:true,mesaj:money(v)+' tahsilat kaydedildi',kayit};
+  },
+
+  /* para iadesi (Sena 10-27): fazla ödenen tutar danışana geri verilince. g: {clientId,amount,date,method,note} — amount POZİTİF girilir,
+     EKSİ ödeme olarak yazılır (iade:true) → bakiye ve o ayın tahsilat geliri birlikte düşer */
+  iadeKaydet(g){
+    if(!g.clientId)return {ok:false,hata:'Danışan seçin',alan:'clientId'};
+    const v=Number(g.amount);
+    if(!v||v<=0)return {ok:false,hata:'Geçerli bir tutar girin',alan:'amount'};
+    const kayit=Store.add('payments',{clientId:g.clientId,amount:-v,iade:true,date:g.date,method:g.method,note:g.note});
+    return {ok:true,mesaj:money(v)+' iade kaydedildi',kayit};
   },
 
   /* g: {clientId,amount,date,note} — amount İŞARETLİ: artı borç ekler, eksi borç siler (form işareti
@@ -4938,7 +4957,7 @@ const DashVM={
     const c=Store.find('clients',a.clientId);
     const satir={
       saat:a.time||'—',ad:c?c.name:'?',
-      altMetin:money(a.fee)+(a.note?' · '+a.note:''),
+      altMetin:seansUcreti(a)+(a.note?' · '+a.note:''),
       durum:a.status,durumSinif:stChip(a.status),durumEtiket:stLabel(a.status),
       waGoster:false,waHref:null,
       randevu:a /* view tıklayınca Forms.apptActions(a)'ya verir */
@@ -5134,7 +5153,7 @@ const TakvimVM={
       const kayitlar=byDate(capa).map(a=>{
         const c=Store.find('clients',a.clientId);
         return{saat:a.time||'—',ad:c?c.name:'?',
-          altMetin:money(a.fee)+(a.recurringId?' · 🔁 düzenli':'')+(a.note?' · '+a.note:''),
+          altMetin:seansUcreti(a)+(a.recurringId?' · 🔁 düzenli':'')+(a.note?' · '+a.note:''),
           durum:a.status,durumSinif:stChip(a.status),durumEtiket:stLabel(a.status),randevu:a};
       });
       out.gun={bos:!kayitlar.length,bosMetni:'Bu gün için randevu yok',kayitlar};
@@ -5279,9 +5298,11 @@ const DanisanVM={
 
     /* H-C6: hesap dökümü (en yeni önce, ilk 25) */
     const entries=[];
-    Store.col('appointments').filter(a=>a.clientId===id&&a.status==='geldi').forEach(a=>entries.push({date:a.date,label:'Seans'+(a.time?' '+a.time:''),amt:a.fee,dir:'borc'}));
+    Store.col('appointments').filter(a=>a.clientId===id&&a.status==='geldi').forEach(a=>entries.push({date:a.date,label:'Seans'+(a.time?' '+a.time:'')+(a.ucretsiz?' (ücretsiz)':''),amt:a.fee,dir:'borc'}));
     Store.col('adjustments').filter(j=>j.clientId===id).forEach(j=>entries.push({date:j.date,label:j.note||'Düzeltme',amt:j.amount,dir:'borc'}));
-    Store.col('payments').filter(p=>p.clientId===id).forEach(p=>entries.push({date:p.date,label:'Ödeme ('+({nakit:'nakit',havale:'havale',kart:'kart'}[p.method]||p.method||'')+')',amt:p.amount,dir:'odeme'}));
+    /* para iadesi (eksi ödeme) borç yönünde yazılır: «+100 ₺ Para iadesi» — avans geri verildi */
+    Store.col('payments').filter(p=>p.clientId===id).forEach(p=>{const yt='('+({nakit:'nakit',havale:'havale',kart:'kart'}[p.method]||p.method||'')+')';
+      entries.push(p.amount<0?{date:p.date,label:'Para iadesi '+yt,amt:-p.amount,dir:'borc'}:{date:p.date,label:'Ödeme '+yt,amt:p.amount,dir:'odeme'})});
     entries.sort((a,b)=>a.date<b.date?1:-1);
     const dokum=entries.slice(0,25).map(en=>({
       etiket:en.label,tarih:fmtD(en.date),
@@ -5574,7 +5595,7 @@ const FinansVM={
   _hareket(mk,user){
     const list=[];
     Store.col('payments').filter(p=>monthKey(p.date)===mk).forEach(p=>list.push({
-      date:p.date,type:'gelir',cat:'Seans tahsilatı',label:Store.clientName(p.clientId)+' ('+(p.method||'')+')',amt:p.amount,by:p.enteredBy,pay:p}));
+      date:p.date,type:'gelir',cat:p.amount<0?'Para iadesi':'Seans tahsilatı',label:Store.clientName(p.clientId)+' ('+(p.method||'')+')',amt:p.amount,by:p.enteredBy,pay:p}));
     const kisiselVar=Gizlilik.kisiselGorur(user);
     Store.col('transactions').filter(x=>monthKey(x.date)===mk&&(kisiselVar||x.type!=='kisisel')).forEach(x=>list.push({
       date:x.date,type:x.type,cat:x.category,label:x.note||x.category,amt:x.amount,by:x.enteredBy,tr:x}));
@@ -5587,8 +5608,8 @@ const FinansVM={
         cipSinif:en.type==='gelir'?'sage':en.type==='kisisel'?'lav':'blush',
         etiket:en.label,
         alt:fmtD(en.date)+' · '+en.cat+(en.by?' · '+en.by:''),
-        tutar:(en.type==='gelir'?'+':'−')+money(en.amt),
-        tutarSinif:en.type==='gelir'?'pos':'neg'
+        tutar:(en.type==='gelir'&&en.amt>=0?'+':'−')+money(Math.abs(en.amt)), /* para iadesi: eksi tahsilat → «−» */
+        tutarSinif:en.type==='gelir'&&en.amt>=0?'pos':'neg'
       }))
     };
   },
@@ -5953,7 +5974,7 @@ const AyarVM={
   finansCsv(ctx){
     const t=(ctx&&ctx.bugun)||todayStr();
     const rows=[['Tarih','Tür','Kategori','Açıklama','Tutar','Giren']];
-    Store.col('payments').forEach(p=>rows.push([p.date,'Gelir','Seans tahsilatı',Store.clientName(p.clientId),p.amount,p.enteredBy||'']));
+    Store.col('payments').forEach(p=>rows.push([p.date,'Gelir',p.amount<0?'Para iadesi':'Seans tahsilatı',Store.clientName(p.clientId),p.amount,p.enteredBy||'']));
     const kisiselVar=Gizlilik.kisiselGorur((ctx&&ctx.user)||Store.user); /* KUL2: Ketty'nin dışa aktardığı dosyada kişisel satır yok */
     Store.col('transactions').filter(x=>kisiselVar||x.type!=='kisisel').forEach(x=>rows.push([x.date,x.type==='gelir'?'Gelir':x.type==='kisisel'?'Kişisel':'Gider',x.category,x.note||'',x.amount,x.enteredBy||'']));
     rows.sort((a,b)=>a[0]<b[0]?1:-1);
@@ -6192,12 +6213,21 @@ const FormVM={
     return {metin:'Bakiye kapalı — bu giriş avans olur',tutar:null};
   },
 
+  /* para iadesi (Sena 10-27): tahsilat formunda «Para iadesi» seçiliyken bakiye satırı + önerilen tutar.
+     Avans (kalan<0) varsa tutar = avans; yoksa tutar null ve uyarı (iade bakiyeyi borca çevirir). */
+  iadeBakiyesi(clientId){
+    if(!clientId)return {metin:'',tutar:null};
+    const b=Store.balance(clientId);
+    if(b.kalan<0)return {metin:'Danışanın avansı: '+money(-b.kalan)+' — iade edilecek tutar',tutar:String(-b.kalan)};
+    return {metin:'Bu danışanın avansı yok — iade bakiyeyi borca çevirir',tutar:null};
+  },
+
   /* K3.2: danışan seçilince/değişince tahsilat tutar alanının alacağı değer.
      elleGirildi (kullanıcı tutarı kendi yazdı) → mevcut değer AYNEN korunur; değilse danışanın kalan bakiyesi
-     (kapalı/avans/seçili değil → boş). */
-  tahsilatTutari(clientId,elleGirildi,mevcut){
+     (kapalı/avans/seçili değil → boş). tur 'iade' → önerilen tutar danışanın avansı (iadeBakiyesi). */
+  tahsilatTutari(clientId,elleGirildi,mevcut,tur){
     if(elleGirildi)return mevcut;
-    const t=FormVM.tahsilatBakiyesi(clientId).tutar;
+    const t=(tur==='iade'?FormVM.iadeBakiyesi(clientId):FormVM.tahsilatBakiyesi(clientId)).tutar;
     return t===null?'':t;
   },
 
@@ -7082,7 +7112,11 @@ const Forms={
       const client=UI.clientSelect(a.clientId||'');
       const date=UI.input({value:a.date||todayStr(),type:'date'});
       const time=UI.input({value:a.time||'10:00',type:'time'});
-      const fee=UI.input({value:a.fee!=null?a.fee:'',type:'number',inputmode:'numeric',placeholder:'danışanın ücreti'});
+      const fee=UI.input({value:a.fee!=null&&!a.ucretsiz?a.fee:'',type:'number',inputmode:'numeric',placeholder:'danışanın ücreti'});
+      /* ücretsiz seans (Sena 10-27): 0 yazmak yerine bilerek işaretlenir; işaretliyken ücret kutusu kapalı */
+      const ucretsiz=h('input',{type:'checkbox'});ucretsiz.checked=!!a.ucretsiz;fee.disabled=ucretsiz.checked;
+      ucretsiz.addEventListener('change',()=>{fee.disabled=ucretsiz.checked});
+      const ucretsizEt=h('label.chk');ucretsizEt.appendChild(ucretsiz);ucretsizEt.appendChild(document.createTextNode('Ücretsiz seans'));
       const note=UI.input({value:a.note||'',placeholder:'isteğe bağlı'});
       const status=UI.seg(FormVM.durumSecenekleri(a.status,true),a.status||'planlandi');
       /* tekrar */
@@ -7118,7 +7152,7 @@ const Forms={
       const fr=h('div.frow');fr.appendChild(UI.field('Tarih',date));fr.appendChild(UI.field('Saat',time));
       m.appendChild(fr);
       const fr2=h('div.frow');fr2.appendChild(UI.field('Ücret (₺)',fee,'boş bırakılırsa danışanın ücreti kullanılır'));
-      m.appendChild(fr2);
+      m.appendChild(fr2);m.appendChild(ucretsizEt);
       m.appendChild(UI.field('Durum',status));
       if(!existing){m.appendChild(UI.field('Tekrar',rep));m.appendChild(repWrap)}
       m.appendChild(UI.field('Not',note));
@@ -7129,7 +7163,7 @@ const Forms={
       }
       acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
       acts.appendChild(h('button.btn',{onclick:()=>{
-        const g={clientId:client.value,date:date.value,time:time.value,fee:fee.value,
+        const g={clientId:client.value,date:date.value,time:time.value,fee:fee.value,ucretsiz:ucretsiz.checked,
           note:note.value,status:status.dataset.value,tekrar:rep.value,tekrarSayisi:repCount.value,
           yeniDanisan:newMode?{name:nName.value,phone:nPhone.value}:null};
         const kaydet=()=>{
@@ -7198,16 +7232,20 @@ const Forms={
       const method=UI.seg([['nakit','Nakit'],['havale','Havale/EFT'],['kart','Kart']],'nakit');
       const note=UI.input({placeholder:'isteğe bağlı'});
       const balInfo=h('div.help',{style:'margin:-6px 0 12px'});
+      /* para iadesi (Sena 10-27): fazla ödenen avans danışana geri verilince — eksi ödeme olarak yazılır */
+      const tur=UI.seg([['tahsilat','Tahsilat'],['iade','Para iadesi']],'tahsilat',()=>showBal(false));
       /* K3.2: kalan bakiye tutar alanına GERÇEK DEĞER olarak yazılır (kodla yazılan değer 'input' olayı doğurmaz → pencere kirlenmez);
          kullanıcı tutarı kendi yazdıysa danışan değişince üzerine yazılmaz */
       let elleGirildi=false;
       amount.addEventListener('input',()=>{elleGirildi=true});
       const showBal=ilk=>{
-        balInfo.textContent=FormVM.tahsilatBakiyesi(client.value).metin;
+        const iade=tur.dataset.value==='iade';
+        balInfo.textContent=(iade?FormVM.iadeBakiyesi(client.value):FormVM.tahsilatBakiyesi(client.value)).metin;
         if(ilk&&amount.value)return; /* açılışta çağıranın önerdiği tutar korunur */
-        amount.value=FormVM.tahsilatTutari(client.value,elleGirildi,amount.value);
+        amount.value=FormVM.tahsilatTutari(client.value,elleGirildi,amount.value,tur.dataset.value);
       };
       client.addEventListener('change',()=>showBal(false));
+      m.appendChild(UI.field('Tür',tur));
       m.appendChild(UI.field('Danışan',client));m.appendChild(balInfo);
       const fr=h('div.frow');fr.appendChild(UI.field('Tutar (₺)',amount));fr.appendChild(UI.field('Tarih',date));
       m.appendChild(fr);
@@ -7217,7 +7255,8 @@ const Forms={
       const acts=h('div.actions');
       acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
       acts.appendChild(h('button.btn',{onclick:()=>{
-        const r=Islem.tahsilatKaydet({clientId:client.value,amount:amount.value,date:date.value,method:method.dataset.value,note:note.value});
+        const g={clientId:client.value,amount:amount.value,date:date.value,method:method.dataset.value,note:note.value};
+        const r=tur.dataset.value==='iade'?Islem.iadeKaydet(g):Islem.tahsilatKaydet(g);
         if(!r.ok)return UI.formHatasi(m,r,{clientId:client,amount});
         close();UI.toast(r.mesaj,'ok');UI.render();onDone&&onDone();
       }},'Kaydet'));
