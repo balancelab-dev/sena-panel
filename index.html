@@ -3667,6 +3667,16 @@ const Store={
     return {sonYedekAt:iso,sonYedekGunu,gunOnce,hatirlat:veriVar&&(gunOnce==null||gunOnce>=this.YEDEK_GUN)};
   },
 
+  /* danışanın temasları, tarihe göre. Bu özellikten önceki tek kayıtlar (c.paketOnerisi, c.ulasildi) da sayılır */
+  temaslar(c){
+    const l=(c.temaslar||[]).slice();
+    const var_=(tarih,f)=>l.some(x=>x.tarih===tarih&&f(x.tur));
+    if(c.paketOnerisi&&c.paketOnerisi.tarih&&!var_(c.paketOnerisi.tarih,t=>t.includes('paket')))
+      l.push({tarih:c.paketOnerisi.tarih,tur:'paket',seans:c.paketOnerisi.seans,fiyat:c.paketOnerisi.fiyat});
+    if(c.ulasildi&&c.ulasildi.tarih&&!var_(c.ulasildi.tarih,t=>t.includes('hatirlat')))
+      l.push({tarih:c.ulasildi.tarih,tur:'hatirlat'});
+    return l.sort((a,b)=>a.tarih<b.tarih?-1:a.tarih>b.tarih?1:0);
+  },
   PAKET_ONERI_ARA:18,PAKET_ONERI_SUSKU:45,PAKET_HATIRLAT_UST:365,
   /* null | {tur, hatirlat, seans, ...} — alerts() 5b'nin ölçütü. Üç durum:
      'tek'    bir kez gelmiş, dönmemiş · 'uzak' birkaç kez gelmiş, artık gelmiyor
@@ -4244,9 +4254,25 @@ const Islem={
 
   /* ---------- danışan (V-F1) ---------- */
   /* Hatırlatmalar > «Ulaşıldı» (Gökhan 10-22): kim, hangi gün ulaştı — iki kişi aynı danışana yazmasın; eşitlenir */
+  /* temas geçmişi (Sena 10-29): c.temaslar = [{tarih, tur:'hatirlat'|'paket'|'hatirlat+paket', kim, seans?, fiyat?}]
+     Raporlar → «Geri kazanım» bunlardan sonra danışanın dönüp dönmediğini ölçer. Aynı gün aynı tür tekrar yazılmaz. */
+  temasEkle(id,tur,ek,bugun){
+    const c=Store.find('clients',id);if(!c)return null;
+    const tarih=bugun||todayStr();
+    const liste=(c.temaslar||[]).slice();
+    const ayni=liste.findIndex(x=>x.tarih===tarih&&x.tur===tur);
+    const kayit=Object.assign({tarih,tur,kim:Store.user},ek||{});
+    if(ayni>=0)liste[ayni]=kayit;else liste.push(kayit);
+    return liste;
+  },
+  /* hatırlatma WhatsApp'ı açıldı (ana ekran / Hatırlatmalar) — yalnız ölçüm için yazılır, «ulaşıldı» işaretlemez */
+  hatirlatmaAcildi(id,bugun){
+    const temaslar=Islem.temasEkle(id,'hatirlat',null,bugun);
+    if(temaslar)Store.update('clients',id,{temaslar});
+  },
   ulasildiIsaretle(id,bugun){
     if(!Store.find('clients',id))return {ok:false,hata:'Danışan bulunamadı'};
-    Store.update('clients',id,{ulasildi:{tarih:bugun||todayStr(),kim:Store.user}});
+    Store.update('clients',id,{ulasildi:{tarih:bugun||todayStr(),kim:Store.user},temaslar:Islem.temasEkle(id,'hatirlat',null,bugun)});
     return {ok:true,mesaj:'Ulaşıldı olarak işaretlendi'};
   },
   /* g: {name,phone,phone2,fee,birthDate,source,status,notes} (phone2: isteğe bağlı ikinci numara — Sena 10-22) · mevcutId: düzenlenen danışanın id'si (yoksa yeni) */
@@ -4423,6 +4449,7 @@ const Islem={
     const tarih=bugun||todayStr();
     const deg={paketOnerisi:{tarih,seans:Number(g.sessions)||0,fiyat:Number(g.price)||0,kim:Store.user}};
     if(g.hatirlat)deg.ulasildi={tarih,kim:Store.user}; /* hatırlatma da yapıldı → Hatırlatmalar'da «ulaşıldı» */
+    deg.temaslar=Islem.temasEkle(clientId,g.hatirlat?'hatirlat+paket':'paket',{seans:deg.paketOnerisi.seans,fiyat:deg.paketOnerisi.fiyat},tarih);
     Store.update('clients',clientId,deg);
     return {ok:true,mesaj:g.hatirlat?'Hatırlatma + paket önerisi WhatsApp\'ta açıldı':'Paket önerisi WhatsApp\'ta açıldı'};
   },
@@ -5066,7 +5093,7 @@ const DashVM={
     if(al.client){
       const klinik=Store.data.settings.clinicName;const ilkAd=al.client.name.split(' ')[0];
       if(al.type==='uzak'&&al.client.phone){
-        eylem={tur:'wa-uzak',href:waLink(al.client.phone,HatirlatmaVM.waMetni(al.client))};
+        eylem={tur:'wa-uzak',danisanId:al.client.id,href:waLink(al.client.phone,HatirlatmaVM.waMetni(al.client))};
       }else if(al.type==='paketOner'){
         eylem={tur:'paketOner',danisanId:al.client.id,etiket:'Paket öner'}; /* view Forms.paketOner(id) açar */
       }else if(al.type==='dogum'&&al.client.phone){
@@ -5797,6 +5824,78 @@ const FinansVM={
    durum({bugun}) düz veri döner; SVG/ızgara çizimi view'dadır. Store'u okur, yazmaz.
    Not: uzak sayısı Store.alerts()'ten gelir (o da todayStr() kullanır) — bugun verilse bile alerts gerçek saatle çalışır. */
 const RaporVM={
+  /* Sena 10-29: hatırlatma / paket önerisinin getirisi.
+     Hatırlatma (hatirlat, hatirlat+paket) → GERI_DONUS_GUN içinde «geldi» seansı varsa danışan GERİ DÖNDÜ.
+     Paket önerisi (paket, hatirlat+paket) → GERI_DONUS_GUN içinde paket satışı varsa PAKET ALDI.
+     Kazandırılan ciro: temastan sonraki KAZANC_GUN içindeki paketsiz «geldi» seans ücretleri + o arada satılan paketler
+     (aynı seans/paket iki temasa sayılmaz). Pencere dolmadıysa ve henüz sonuç yoksa «bekleniyor». */
+  GERI_DONUS_GUN:60,KAZANC_GUN:90,GERI_KAZANIM_AY:12,
+  geriKazanim(ctx){
+    const t=(ctx&&ctx.bugun)||todayStr();
+    const bas=addDays(t,-this.GERI_KAZANIM_AY*30);
+    const G=this.GERI_DONUS_GUN,K=this.KAZANC_GUN;
+    const sayilanSeans=new Set(),sayilanPaket=new Set();
+    let ulasilan=0,dondu=0,bekliyor=0,oneri=0,paketAlan=0,seans=0,ciro=0;
+    const satirlar=[];
+    for(const c of Store.col('clients')){
+      const tm=Store.temaslar(c).filter(x=>x.tarih>=bas&&x.tarih<=t);
+      if(!tm.length)continue;
+      const geldi=Store.col('appointments').filter(a=>a.clientId===c.id&&a.status==='geldi'&&a.date<=t);
+      const satis=Store.col('packageSales').filter(x=>x.clientId===c.id&&x.date<=t);
+      const hat=tm.filter(x=>x.tur.includes('hatirlat')),pk=tm.filter(x=>x.tur.includes('paket'));
+      const sonra=(x,gun,d)=>d>x.tarih&&d<=addDays(x.tarih,gun);
+      let sonuc=null,donusTarihi=null,paketTarihi=null;
+      if(hat.length){
+        ulasilan++;
+        for(const x of hat){const a=geldi.filter(a=>sonra(x,G,a.date)).sort((a,b)=>a.date<b.date?-1:1)[0];if(a){donusTarihi=a.date;break}}
+        if(donusTarihi){dondu++;sonuc='dondu'}
+        else if(daysBetween(hat[hat.length-1].tarih,t)<G){bekliyor++;sonuc='bekliyor'}
+        else sonuc='donmedi';
+      }
+      if(pk.length){
+        oneri++;
+        for(const x of pk){const s2=satis.find(s2=>s2.date>=x.tarih&&s2.date<=addDays(x.tarih,G));if(s2){paketTarihi=s2.date;break}}
+        if(paketTarihi)paketAlan++;
+        if(!sonuc)sonuc=paketTarihi?'paket':daysBetween(pk[pk.length-1].tarih,t)<G?'bekliyor':'almadi';
+      }
+      /* kazanç: yalnız sonuç veren temasların penceresi */
+      let cSeans=0,cCiro=0;
+      if(donusTarihi||paketTarihi){
+        for(const x of tm){
+          for(const a of geldi)if(sonra(x,K,a.date)&&!sayilanSeans.has(a.id)){sayilanSeans.add(a.id);cSeans++;if(!a.packageSaleId)cCiro+=Number(a.fee)||0}
+          for(const s2 of satis)if(s2.date>=x.tarih&&s2.date<=addDays(x.tarih,K)&&!sayilanPaket.has(s2.id)){sayilanPaket.add(s2.id);cCiro+=Number(s2.price)||0}
+        }
+      }
+      seans+=cSeans;ciro+=cCiro;
+      const son=tm[tm.length-1];
+      const turAd={hatirlat:'Hatırlatma','hatirlat+paket':'Hatırlatma + paket',paket:'Paket önerisi'};
+      const SON={dondu:['good','Geri döndü'],paket:['good','Paket aldı'],bekliyor:['sand','Bekleniyor'],donmedi:['gray','Dönmedi'],almadi:['gray','Almadı']};
+      const [sinif,etiket]=SON[sonuc]||['gray','—'];
+      satirlar.push({id:c.id,ad:c.name,bas:initials(c.name),renk:avColor(c.name),tarih:son.tarih,
+        aciklama:turAd[son.tur]+' · '+fmtD(son.tarih)+(donusTarihi?' → '+fmtD(donusTarihi)+' geldi':'')+(paketTarihi?' · paket aldı':'')+(cCiro?' · '+money(cCiro):''),
+        sinif:(paketTarihi&&sonuc!=='dondu')?'good':sinif,etiket:paketTarihi&&sonuc==='dondu'?'Döndü + paket':etiket});
+    }
+    satirlar.sort((a,b)=>a.tarih<b.tarih?1:a.tarih>b.tarih?-1:0);
+    const sonuclanan=ulasilan-bekliyor; /* oran yalnız sonucu belli olanlardan: bekleyenler henüz «dönmedi» sayılmaz */
+    const oran=sonuclanan>0?Math.round(dondu/sonuclanan*100):0;
+    const tanitim=ulasilan||oneri?('Son '+this.GERI_KAZANIM_AY+' ayda panelin hatırlatmalarıyla '+ulasilan+' danışana ulaştık'
+      +(dondu?', '+dondu+' danışan geri döndü (%'+oran+')':'')
+      +(oneri?'; '+oneri+' paket önerisinden '+paketAlan+' tanesi satışa dönüştü':'')
+      +(ciro?'. Bu temasların getirdiği: '+num(seans)+' seans, '+money(ciro)+'.':'.')):'';
+    return {
+      bos:!satirlar.length,
+      bosMetni:'Henüz ölçülecek temas yok. Ana ekrandaki «Paket öner» ve hatırlatma mesajları gönderildikçe burada sonuçları görünür.',
+      kartlar:[
+        {ad:'Ulaşılan danışan',deger:num(ulasilan),alt:'hatırlatma gönderilen'},
+        {ad:'Geri dönen',deger:num(dondu),alt:sonuclanan>0?'%'+oran+(bekliyor?' · '+bekliyor+' bekleniyor':''):bekliyor?bekliyor+' bekleniyor':'—'},
+        {ad:'Paket alan',deger:num(paketAlan),alt:oneri?oneri+' öneriden':'öneri yok'},
+        {ad:'Kazandırılan ciro',deger:money(ciro),alt:num(seans)+' seans'}
+      ],
+      tanitim,satirlar,
+      kural:'Temastan sonraki '+G+' gün içinde gelen «geri döndü», paket alan «paket aldı» sayılır; ciro '+K+' günlük pencereden hesaplanır.'
+    };
+  },
+
   AY_SAYISI:6,
   ISI_SAATLERI:[8,21],      /* 8..21 (14 sütun) */
   ISI_GUN_ARALIGI:56,       /* son 56 gün */
@@ -7743,7 +7842,8 @@ UI.register('dash',main=>{
     if(ey){
       const act=h('div.act');
       if(ey.tur==='wa-uzak'||ey.tur==='wa-dogum'){
-        const wa=h('a.btn.soft.sm',{href:ey.href,target:'_blank','aria-label':'WhatsApp – '+al.baslik});
+        const wa=h('a.btn.soft.sm',{href:ey.href,target:'_blank','aria-label':'WhatsApp – '+al.baslik,
+          onclick:()=>{if(ey.tur==='wa-uzak'&&ey.danisanId)Islem.hatirlatmaAcildi(ey.danisanId)}});
         wa.appendChild(icon('wa'));act.appendChild(wa);
       }else if(ey.tur==='ac'){
         act.appendChild(h('button.btn.soft.sm',{onclick:()=>UI.go('clients',ey.danisanId)},ey.etiket));
@@ -8112,7 +8212,7 @@ UI.register('hatir',main=>{
       const sm=h('small');sm.textContent=s.aciklama;bd.appendChild(sm);
       const end=h('div.end',{style:'display:flex;gap:6px;align-items:center'});
       if(s.araVerdi){const ch=h('span.chip.gray');ch.textContent='Ara verdi';end.appendChild(ch)}
-      if(s.waHref){const wa=h('a.btn.soft.sm',{href:s.waHref,target:'_blank',onclick:e=>e.stopPropagation(),'aria-label':'WhatsApp – '+s.ad});
+      if(s.waHref){const wa=h('a.btn.soft.sm',{href:s.waHref,target:'_blank',onclick:e=>{e.stopPropagation();Islem.hatirlatmaAcildi(s.id)},'aria-label':'WhatsApp – '+s.ad});
         wa.appendChild(icon('wa'));end.appendChild(wa)}
       if(!s.ulasildi)end.appendChild(h('button.btn.ghost.sm',{onclick:e=>{e.stopPropagation();Forms.paketOner(s.id)}},'Paket öner'));
       if(!s.ulasildi)end.appendChild(h('button.btn.ghost.sm',{onclick:e=>{e.stopPropagation();
@@ -8434,6 +8534,36 @@ UI.register('rep',main=>{
 
   const v=RaporVM.durum();
   const ay=v.aylar;
+
+  /* geri kazanım (Sena 10-29): hatırlatma + paket önerilerinin getirisi */
+  const gk=RaporVM.geriKazanim();
+  const gkc=h('div.card.mb');
+  const gkh=h('h3');gkh.appendChild(icon('heart'));gkh.appendChild(document.createTextNode(' Geri kazanım — hatırlatma ve paket önerilerinin getirisi'));
+  const gkhint=h('span.hint');gkhint.textContent='son 12 ay';gkh.appendChild(gkhint);gkc.appendChild(gkh);
+  if(gk.bos){const e=h('div.empty');e.textContent=gk.bosMetni;gkc.appendChild(e)}
+  else{
+    const st=h('div.grid.cols-4');
+    gk.kartlar.forEach(k=>{const c=h('div.stat');
+      const l=h('div.lbl');l.textContent=k.ad;c.appendChild(l);
+      const val=h('div.val');val.textContent=k.deger;c.appendChild(val);
+      const a=h('div.delta-taban');a.textContent=k.alt;c.appendChild(a);st.appendChild(c)});
+    gkc.appendChild(st);
+    const tn=h('div.alert.good',{style:'margin:10px 0'});
+    const tb=h('div',{style:'flex:1'});const tt=h('small');tt.textContent=gk.tanitim;tb.appendChild(tt);tn.appendChild(tb);
+    const kop=h('div.act');kop.appendChild(h('button.btn.soft.sm',{onclick:async()=>{
+      try{await navigator.clipboard.writeText(gk.tanitim);UI.toast('Özet kopyalandı','ok')}catch(e){UI.toast('Kopyalanamadı','err')}}},'Kopyala'));
+    tn.appendChild(kop);gkc.appendChild(tn);
+    gk.satirlar.forEach(s=>{
+      const row=UI.tiklanir(h('div.row.click'),()=>UI.go('clients',s.id));
+      const av=h('div.av');av.style.background=s.renk;av.textContent=s.bas;
+      const bd=h('div.body');const b=h('b');b.textContent=s.ad;bd.appendChild(b);
+      const sm=h('small');sm.textContent=s.aciklama;bd.appendChild(sm);
+      const end=h('div.end');const ch=h('span.chip.'+s.sinif);ch.textContent=s.etiket;end.appendChild(ch);
+      row.appendChild(av);row.appendChild(bd);row.appendChild(end);gkc.appendChild(row);
+    });
+    const kr=h('div.help');kr.textContent=gk.kural;gkc.appendChild(kr);
+  }
+  main.appendChild(gkc);
 
   const grid=h('div.grid.cols-2');
 
