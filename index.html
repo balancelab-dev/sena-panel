@@ -2988,6 +2988,10 @@ const turUcreti=tur=>{const S=Store.data.settings;
 /* randevu ücret kutusu boşsa: danışanın kendi türündeyse danışanın ücreti, başka türde ise o türün standart ücreti */
 const varsayilanUcret=(c,tur)=>{tur=tur||'bireysel';
   return c&&(c.tur||'bireysel')===tur&&c.fee?Number(c.fee):turUcreti(tur)};
+/* paket türü (Sena 10-29): packages/packageSales.tur — eski kayıtlarda yok → bireysel */
+const paketTuru=p=>p&&p.tur==='cift'?'cift':'bireysel';
+const ciftEki=p=>paketTuru(p)==='cift'&&!/çift/i.test(p.name||'')?'Çift · ':''; /* adında zaten «çift» varsa tekrar yazılmaz */
+const paketEtiketi=p=>ciftEki(p)+p.name+' · '+p.sessions+' seans · '+money(p.price);
 const PAKET_HATIRLAT_SABLONU='Merhaba {ad}, nasılsınız? Umarım her şey yolundadır. Bir süredir görüşemedik; dilerseniz kaldığımız yerden devam edebiliriz. Bu dönem size özel bir paketimiz de var: {seans} seans toplam {fiyat} (seans başı {seansbasi}; normalde {normal}). Uygun olduğunuzda haber vermeniz yeterli. 🌿 {klinik}';
 const PAKET_ONERI_SABLONU='Merhaba {ad}, seanslarımıza daha düzenli devam edebilmeniz için size özel bir paket hazırladık: {seans} seans toplam {fiyat} (seans başı {seansbasi}; normalde {normal}). Dilerseniz bir sonraki görüşmemizde birlikte planlayalım. 🌿 {klinik}';
 const num=n=>(Number(n)||0).toLocaleString('tr-TR');
@@ -3632,15 +3636,16 @@ const Store={
     const used=this.col('appointments').filter(a=>a.packageSaleId===s.id&&a.status==='geldi').length;
     return {used,remaining:Math.max(0,(Number(s.sessions)||0)-used)};
   },
-  activeSale(clientId){
-    const sales=this.col('packageSales').filter(s=>s.clientId===clientId).sort((a,b)=>a.date<b.date?-1:1);
+  /* tur verilirse yalnız o türdeki paket (çift seansı çift paketinden, bireysel seans bireysel paketten düşer) */
+  activeSale(clientId,tur){
+    const sales=this.col('packageSales').filter(s=>s.clientId===clientId&&(!tur||paketTuru(s)===tur)).sort((a,b)=>a.date<b.date?-1:1);
     for(const s of sales)if(this.saleUsage(s).remaining>0)return s;
     return null;
   },
   /* "geldi" işaretlenen seansı varsa aktif paketten düş (ücretsiz seans düşmez — Sena 10-27) */
   applyPackage(a){
     if(!a||a.packageSaleId||a.ucretsiz)return null;
-    const sale=this.activeSale(a.clientId);
+    const sale=this.activeSale(a.clientId,a.tur==='cift'?'cift':'bireysel');
     if(!sale)return null;
     const u=this.saleUsage(sale).used;
     const per=Math.round(sale.price/sale.sessions);
@@ -4406,7 +4411,7 @@ const Islem={
     if(!(g.name||'').trim())return {ok:false,hata:'Paket adı girin',alan:'name'};
     if(!(Number(g.sessions)>1))return {ok:false,hata:'Seans sayısı en az 2 olmalı',alan:'sessions'};
     if(!(Number(g.price)>0))return {ok:false,hata:'Fiyat girin',alan:'price'};
-    const rec={name:g.name.trim(),sessions:Number(g.sessions),price:Number(g.price),note:g.note};
+    const rec={name:g.name.trim(),sessions:Number(g.sessions),price:Number(g.price),note:g.note,tur:g.tur==='cift'?'cift':'bireysel'};
     const kayit=mevcutId?Store.update('packages',mevcutId,rec):Store.add('packages',rec);
     return {ok:true,mesaj:'Paket kaydedildi',kayit};
   },
@@ -4423,17 +4428,18 @@ const Islem={
   },
 
   /* ---------- paket satışı (V-F17) ---------- */
-  /* g: {clientId,packageId,sessions,price,date,method} — satış + aynı tutarda ödeme kaydı */
+  /* g: {clientId,packageId,sessions,price,date,method,tur} — satış + aynı tutarda ödeme kaydı. tur yoksa hazır paketin türü */
   paketSat(g){
     if(!g.clientId)return {ok:false,hata:'Danışan seçin',alan:'clientId'};
     if(!(Number(g.sessions)>1))return {ok:false,hata:'Seans sayısı en az 2 olmalı',alan:'sessions'};
     if(!(Number(g.price)>0))return {ok:false,hata:'Fiyat girin',alan:'price'};
     const t=Store.find('packages',g.packageId);
+    const tur=g.tur==='cift'||g.tur==='bireysel'?g.tur:paketTuru(t);
     let sale,odeme;
     Store.toplu(()=>{ // satış + ödeme tek touch
       sale=Store.add('packageSales',{clientId:g.clientId,packageId:g.packageId||null,
-        name:t?t.name:Number(g.sessions)+' seanslık paket',
-        sessions:Number(g.sessions),price:Number(g.price),date:g.date,method:g.method});
+        name:t?t.name:Number(g.sessions)+' seanslık '+(tur==='cift'?'çift terapisi ':'')+'paket',
+        sessions:Number(g.sessions),price:Number(g.price),date:g.date,method:g.method,tur});
       odeme=Store.add('payments',{clientId:g.clientId,amount:Number(g.price),date:g.date,
         method:g.method,note:'Paket satışı: '+sale.name,packageSaleId:sale.id});
     });
@@ -4889,7 +4895,7 @@ const OrnekVeri={
       p5:push('packages',{name:'5 Seanslık Destek Paketi',sessions:5,price:6750,note:'%10 avantajlı'}),
       p10:push('packages',{name:'10 Seanslık Yol Arkadaşlığı',sessions:10,price:12750,note:'%15 avantajlı'})
     };
-    push('packages',{name:'Çift Görüşmesi (3 seans)',sessions:3,price:5400,note:'60 dk yerine 80 dk'});
+    push('packages',{name:'Çift Görüşmesi (3 seans)',sessions:3,price:5400,note:'60 dk yerine 80 dk',tur:'cift'});
     const sell=(cfg,tpl,price,used)=>{
       const done=D.appointments.filter(a=>a.clientId===cfg._c.id&&a.status==='geldi'&&a.date<=t).sort(byDate);
       const take=done.slice(-used);
@@ -5366,7 +5372,7 @@ const DanisanVM={
       const last=mySales[0];const u=Store.saleUsage(last);
       aktifPaket={
         sinif:u.remaining===0?'warn':'good',
-        baslik:last.name+(u.remaining===0?' — tamamlandı':' — '+u.remaining+' seans kaldı'),
+        baslik:ciftEki(last)+last.name+(u.remaining===0?' — tamamlandı':' — '+u.remaining+' seans kaldı'),
         alt:u.used+'/'+last.sessions+' kullanıldı · '+fmtD(last.date)+' tarihinde '+money(last.price)+' ile alındı',
         yuzde:Math.round(u.used/last.sessions*100)+'%',
         yenile:u.remaining===0,paketId:last.packageId
@@ -5707,9 +5713,9 @@ const FinansVM={
   _paket(){
     const tpls=Store.col('packages');
     const tanimlar=tpls.map(p=>{
-      const normal=(Store.data.settings.defaultFee||0)*p.sessions;
+      const normal=turUcreti(paketTuru(p))*p.sessions;
       return {
-        kayit:p,id:p.id,ad:p.name,
+        kayit:p,id:p.id,ad:ciftEki(p)+p.name,
         alt:p.sessions+' seans · seans başı '+money(Math.round(p.price/p.sessions))+(normal>p.price?' · '+money(normal-p.price)+' avantaj':''),
         tutar:money(p.price)
       };
@@ -5719,7 +5725,7 @@ const FinansVM={
       const u=Store.saleUsage(s);const ad=Store.clientName(s.clientId);
       return {
         danisan:ad,bas:initials(ad),renk:avColor(ad),
-        alt:s.name+' · '+fmtD(s.date)+' · '+money(s.price),
+        alt:ciftEki(s)+s.name+' · '+fmtD(s.date)+' · '+money(s.price),
         yuzde:Math.round(u.used/s.sessions*100)+'%',
         cipSinif:u.remaining===0?'gray':u.remaining===1?'sand':'sage',
         cipMetin:u.remaining===0?'Tamamlandı':u.used+'/'+s.sessions+' · '+u.remaining+' kaldı'
@@ -6363,7 +6369,8 @@ const FormVM={
   paketOneriBaslangic(clientId){
     const c=Store.find('clients',clientId);
     const birim=varsayilanUcret(c,c&&c.tur);
-    const tpls=Store.col('packages');
+    const tur=(c&&c.tur)==='cift'?'cift':'bireysel';
+    const tpls=Store.col('packages').filter(p=>paketTuru(p)===tur);
     const ilk=tpls[0];
     return {birim,sessions:ilk?ilk.sessions:4,price:ilk?ilk.price:Math.round(birim*4*0.9/100)*100,packageId:ilk?ilk.id:''};
   },
@@ -6379,7 +6386,7 @@ const FormVM={
   /* H-F11: paket satışında hazır paket seçilince alanlara kopyalanacak değerler; paket yoksa null */
   paketSablonu(packageId){
     const t=Store.find('packages',packageId);
-    return t?{sessions:t.sessions,price:t.price}:null;
+    return t?{sessions:t.sessions,price:t.price,tur:paketTuru(t)}:null;
   }
 };
 /* ==== charts.js ==== */
@@ -7485,15 +7492,17 @@ const Forms={
       const sessions=UI.input({value:p.sessions||5,type:'number',min:2,max:50,inputmode:'numeric'});
       const price=UI.input({value:p.price||'',type:'number',inputmode:'numeric',placeholder:'toplam fiyat'});
       const note=UI.input({value:p.note||'',placeholder:'isteğe bağlı açıklama'});
+      const tur=UI.seg(SEANS_TURLERI,paketTuru(p),()=>refresh());
       const hint=h('div.alert.info',{style:'margin-bottom:13px'});
       const hIco=h('div.ico');hIco.appendChild(icon('gift'));hint.appendChild(hIco);
       const hBody=h('div');const hb=h('b');const hs=h('small');hBody.appendChild(hb);hBody.appendChild(hs);hint.appendChild(hBody);
       const refresh=()=>{
-        const o=FormVM.paketOnizleme(sessions.value,price.value);
+        const o=FormVM.paketOnizleme(sessions.value,price.value,turUcreti(tur.dataset.value));
         hb.textContent=o.baslik;hs.textContent=o.alt;
       };
       sessions.addEventListener('input',refresh);price.addEventListener('input',refresh);
       m.appendChild(UI.field('Paket adı',name));
+      m.appendChild(UI.field('Seans türü',tur,'çift terapisi paketi yalnız çift seanslarından düşer'));
       const fr=h('div.frow');fr.appendChild(UI.field('Seans sayısı',sessions));fr.appendChild(UI.field('Toplam fiyat (₺)',price));
       m.appendChild(fr);
       m.appendChild(hint);refresh();
@@ -7505,7 +7514,7 @@ const Forms={
       }
       acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
       acts.appendChild(h('button.btn',{onclick:()=>{
-        const r=Islem.paketKaydet({name:name.value,sessions:sessions.value,price:price.value,note:note.value},existing&&existing.id);
+        const r=Islem.paketKaydet({name:name.value,sessions:sessions.value,price:price.value,note:note.value,tur:tur.dataset.value},existing&&existing.id);
         if(!r.ok)return UI.formHatasi(m,r,{name,sessions,price});
         close();UI.toast(r.mesaj,'ok');UI.render();
       }},'Kaydet'));
@@ -7521,8 +7530,8 @@ const Forms={
       const b=FormVM.paketOneriBaslangic(clientId);
       /* Sena 10-29: geri dönmeyen danışana «nasılsınız» hatırlatması + paket; seyrek gelene yalnız paket. Elle de değiştirilebilir */
       const kalip=UI.seg([['hatirlat','Hatırlatma + paket'],['oneri','Yalnız paket önerisi']],d&&!d.hatirlat?'oneri':'hatirlat',()=>{msgElle=false;yenile()});
-      const tpls=Store.col('packages');
-      const tpl=UI.select([['','Özel paket'],...tpls.map(p=>[p.id,p.name+' · '+p.sessions+' seans · '+money(p.price)])],b.packageId);
+      const tpls=Store.col('packages').filter(p=>paketTuru(p)===(c.tur==='cift'?'cift':'bireysel'));
+      const tpl=UI.select([['','Özel paket'],...tpls.map(p=>[p.id,paketEtiketi(p)])],b.packageId);
       const sessions=UI.input({value:b.sessions,type:'number',inputmode:'numeric',min:2});
       const price=UI.input({value:b.price,type:'number',inputmode:'numeric'});
       const prev=h('div.alert.info',{style:'margin-bottom:12px'});
@@ -7567,17 +7576,23 @@ const Forms={
     UI.modal(FormVM.ADLAR.paketSat,(m,close)=>{
       const tpls=Store.col('packages');
       const client=UI.clientSelect(clientId||'');
-      const tpl=UI.select([['','— Paket seçin —'],...tpls.map(p=>[p.id,p.name+' · '+p.sessions+' seans · '+money(p.price)])],packageId||'');
+      const tpl=UI.select([['','— Paket seçin —'],...tpls.map(p=>[p.id,paketEtiketi(p)])],packageId||'');
+      /* seans türü: hazır paket seçilince onun türü; değilse danışanın türü */
+      const ilkC=Store.find('clients',clientId);
+      const tur=UI.seg(SEANS_TURLERI,(ilkC&&ilkC.tur)==='cift'?'cift':'bireysel');
+      const turSec=v=>{const b=$$('button',tur)[v==='cift'?1:0];if(b&&tur.dataset.value!==v)b.click()};
+      client.addEventListener('change',()=>{const c2=Store.find('clients',client.value);if(c2&&!tpl.value)turSec(c2.tur==='cift'?'cift':'bireysel')});
       const sessions=UI.input({type:'number',min:2,max:50,inputmode:'numeric'});
       const price=UI.input({type:'number',inputmode:'numeric'});
       const date=UI.input({type:'date',value:todayStr()});
       const method=UI.seg([['nakit','Nakit'],['havale','Havale/EFT'],['kart','Kart']],'havale');
-      const fillFrom=()=>{const t=FormVM.paketSablonu(tpl.value);if(t){sessions.value=t.sessions;price.value=t.price}};
+      const fillFrom=()=>{const t=FormVM.paketSablonu(tpl.value);if(t){sessions.value=t.sessions;price.value=t.price;turSec(t.tur)}};
       tpl.addEventListener('change',fillFrom);
       if(packageId)fillFrom();
       m.appendChild(UI.field('Danışan',client));
       if(tpls.length)m.appendChild(UI.field('Hazır paket',tpl,'seçince seans ve fiyat otomatik dolar; elle de değiştirebilirsiniz'));
       else m.appendChild(h('p',{style:'font-size:12px;color:var(--muted);margin:-4px 0 12px'},'İpucu: Finans → Paketler bölümünde hazır paketler tasarlayabilirsiniz.'));
+      m.appendChild(UI.field('Seans türü',tur,'çift terapisi paketi yalnız çift seanslarından düşer'));
       const fr=h('div.frow');fr.appendChild(UI.field('Seans sayısı',sessions));fr.appendChild(UI.field('Fiyat (₺)',price));
       m.appendChild(fr);
       const fr2=h('div.frow');fr2.appendChild(UI.field('Satış tarihi',date));m.appendChild(fr2);
@@ -7586,7 +7601,7 @@ const Forms={
       acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
       acts.appendChild(h('button.btn',{onclick:()=>{
         const r=Islem.paketSat({clientId:client.value,packageId:tpl.value,sessions:sessions.value,price:price.value,
-          date:date.value,method:method.dataset.value});
+          date:date.value,method:method.dataset.value,tur:tur.dataset.value});
         if(!r.ok)return UI.formHatasi(m,r,{clientId:client,sessions,price});
         close();UI.toast(r.mesaj,'ok');UI.render();
       }},'Sat ve tahsil et'));
