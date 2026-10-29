@@ -416,7 +416,7 @@ select:disabled{opacity:.45}
 /* telefon (<=900): formdaki .seg tam genişlik + eşit parça (5'li durum tek satır); satır alt yazısı 2 satıra kadar; alan hizası */
 @media(max-width:900px){
   .field .seg{display:flex;width:100%;flex-wrap:nowrap}
-  .field .seg button{flex:1 1 0;min-width:0;padding:6px 2px;text-align:center;white-space:nowrap}
+  .field .seg button{flex:1 1 0;min-width:0;padding:6px 2px;text-align:center;white-space:normal;line-height:1.2} /* A3: «Hatırlatma + paket» gibi uzun seçenek taşmaz, iki satıra sarar */
   .row .body small{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical}
   .frow{align-items:flex-end}
   .field textarea{min-height:104px}
@@ -433,6 +433,8 @@ select:disabled{opacity:.45}
   .btn.sm{min-height:44px;min-width:44px}
   .btn.icon,.tbl-toggle{position:relative}
   .btn.icon::after{content:"";position:absolute;inset:-6px}
+  .tbl-toggle{min-height:44px;display:inline-flex;align-items:center} /* A4: ölçülen boyut da >=44 (yalnız ::after değil) */
+  .appt,.week-col .evt{min-height:44px}
   .tbl-toggle::after{content:"";position:absolute;inset:-14px -6px}
   .modal h2 .x{min-width:44px;min-height:44px;margin:-10px -10px -10px auto;display:inline-flex;align-items:center;justify-content:center}
   .userchip a{padding:14px 8px;margin:-14px -8px}
@@ -460,7 +462,7 @@ select:disabled{opacity:.45}
 @media(max-width:900px){
   .cal-cell .more{display:none}
   .cal-cell{padding:3px}
-  .cal-cell .toplam{display:block;font-size:9.5px;line-height:1.15;color:var(--ink-2);font-weight:650;margin-top:2px;letter-spacing:-.1px} /* dar hücrede iki satıra bölünür: «4» / «randevu» */
+  .cal-cell .toplam{display:block;font-size:11px;line-height:1.15;color:var(--ink-2);font-weight:650;margin-top:2px;letter-spacing:-.1px} /* dar hücrede iki satıra bölünür: «4» / «randevu» */
 }
 .cal-lejant{margin-top:12px}
 /* telefonda form dışı seçici şeritler (süzgeç, sekme) tek satır kalır, sığmazsa yana kayar (masa, K3b2) */
@@ -544,6 +546,28 @@ select:disabled{opacity:.45}
 
 /* KUL2: Finans KPI şeridi kart sayısı tekse (Ketty: 3 kart; telefonda/tablette 2 sütun) son kart tek kalmasın — tam genişlik. Sena'nın 4 kartı etkilenmez. */
 @media(max-width:900px){.grid.cols-3.mb>.card:last-child:nth-child(odd){grid-column:1/-1}}
+
+/* ============ dört göz 2. tur — Dilim A ============ */
+/* A1: danışan detayı eylem düğmeleri — telefonda iki EŞİT sütun; her düğme hücreyi doldurur, yazı ortalı ve sarabilir,
+   aynı satırdaki düğmeler eşit yükseklikte; tek sayıda kalırsa SON düğme iki sütunu kaplar. Masaüstü: eskisi gibi sarmalı sıra. */
+.det-eylem{flex-wrap:wrap;gap:8px}
+@media(max-width:900px){
+  .det-eylem{display:grid;grid-template-columns:1fr 1fr;align-items:stretch}
+  .det-eylem>.btn{width:100%;min-width:0;justify-content:center;text-align:center;white-space:normal;line-height:1.25}
+  .det-eylem>.btn:last-child:nth-child(odd){grid-column:1/-1}
+}
+/* A6: seg yatay kaydırılınca odak halkası kırpılmasın — halka düğmenin İÇİNDE */
+.seg button:focus-visible{outline-offset:-2px}
+/* A7: açılır bölümlerde açık/kapalı oku (işaretçi gizli olduğundan) */
+details.acc summary::after{content:"";margin-left:auto;flex:0 0 auto;width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);transition:transform .15s}
+details.acc[open] summary::after{transform:rotate(-135deg)}
+/* A9: iç içe etkileşimli satırlarda adı taşıyan gerçek düğme — yazı gibi görünür */
+.satir-ad{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;text-align:left;cursor:pointer}
+/* A10: telefonda üst bardaki geri düğmesi (masaüstünde yan menü var) */
+.btn.mobil-geri{display:none}
+@media(max-width:900px){.btn.mobil-geri{display:inline-flex}}
+/* A15: ekran değişince odak başlığa taşınır; başlık etkileşimli değil — halka çizilmesin */
+#main h1[tabindex="-1"]:focus{outline:none}
 </style>
 <style id="tema-3b" media="not all">
 
@@ -639,7 +663,7 @@ select:disabled{opacity:.45}
     <main class="main" id="main"></main>
   </div>
 </div>
-<nav class="tabbar" id="tabbar"></nav>
+<nav class="tabbar" id="tabbar" aria-label="Alt menü"></nav>
 <button class="fab" id="fab" aria-label="Hızlı işlem"></button>
 <div id="modals"></div>
 <div id="toasts"></div>
@@ -4260,6 +4284,15 @@ const Kurulum={
    view `UI.formHatasi` ile o alana odaklar. Onay (UI.confirm), toast tipi, kapatma, render view'ın işidir. */
 const Islem={
 
+  /* tarih zorunluluğu (dört göz 2. tur B2): boş / YYYY-MM-DD olmayan / takvimde olmayan gün → hata, geçerliyse null.
+     alan: hatanın bağlanacağı g adı (çoğu formda 'date'; paket iptalinde 'tarih'). */
+  tarihDenetle(t,alan){
+    const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(t||'');
+    const d=m&&new Date(Date.UTC(+m[1],+m[2]-1,+m[3]));
+    const gecerli=!!d&&d.getUTCFullYear()===+m[1]&&d.getUTCMonth()===+m[2]-1&&d.getUTCDate()===+m[3];
+    return gecerli?null:{ok:false,hata:'Tarih seçin',alan:alan||'date'};
+  },
+
   /* ---------- danışan (V-F1) ---------- */
   /* Hatırlatmalar > «Ulaşıldı» (Gökhan 10-22): kim, hangi gün ulaştı — iki kişi aynı danışana yazmasın; eşitlenir */
   /* temas geçmişi (Sena 10-29): c.temaslar = [{tarih, tur:'hatirlat'|'paket'|'hatirlat+paket', kim, seans?, fiyat?}]
@@ -4328,7 +4361,7 @@ const Islem={
   randevuDogrula(g){
     if(g.yeniDanisan&&!(g.yeniDanisan.name||'').trim())return {ok:false,hata:'Yeni danışanın adını yazın',alan:'yeniAd'};
     if(!g.yeniDanisan&&!g.clientId)return {ok:false,hata:'Danışan seçin',alan:'clientId'};
-    return null;
+    return Islem.tarihDenetle(g.date);
   },
 
   /* KUL2 çakışma (saf): aynı tarih + aynı başlangıç saatinde, durumu planlandı/geldi olan BAŞKA randevu (yoksa null).
@@ -4389,6 +4422,7 @@ const Islem={
     if(!g.clientId)return {ok:false,hata:'Danışan seçin',alan:'clientId'};
     const v=Number(g.amount);
     if(!v||v<=0)return {ok:false,hata:'Geçerli bir tutar girin',alan:'amount'};
+    const th=Islem.tarihDenetle(g.date);if(th)return th;
     const kayit=Store.add('payments',{clientId:g.clientId,amount:v,date:g.date,method:g.method,note:g.note});
     return {ok:true,mesaj:money(v)+' tahsilat kaydedildi',kayit};
   },
@@ -4399,6 +4433,7 @@ const Islem={
     if(!g.clientId)return {ok:false,hata:'Danışan seçin',alan:'clientId'};
     const v=Number(g.amount);
     if(!v||v<=0)return {ok:false,hata:'Geçerli bir tutar girin',alan:'amount'};
+    const th=Islem.tarihDenetle(g.date);if(th)return th;
     const kayit=Store.add('payments',{clientId:g.clientId,amount:-v,iade:true,date:g.date,method:g.method,note:g.note});
     return {ok:true,mesaj:money(v)+' iade kaydedildi',kayit};
   },
@@ -4408,6 +4443,7 @@ const Islem={
   duzeltmeKaydet(g){
     if(!g.clientId)return {ok:false,hata:'Danışan seçin',alan:'clientId'};
     if(!Number(g.amount))return {ok:false,hata:'Geçerli bir tutar girin',alan:'amount'};
+    const th=Islem.tarihDenetle(g.date);if(th)return th;
     const kayit=Store.add('adjustments',{clientId:g.clientId,amount:Number(g.amount),date:g.date,note:g.note});
     return {ok:true,mesaj:'Kaydedildi',kayit};
   },
@@ -4417,6 +4453,7 @@ const Islem={
   islemKaydet(g,mevcutId){
     const v=Number(g.amount);
     if(!v||v<=0)return {ok:false,hata:'Geçerli bir tutar girin',alan:'amount'};
+    const th=Islem.tarihDenetle(g.date);if(th)return th;
     const rec={type:g.type,category:g.category,amount:v,date:g.date,note:g.note};
     const kayit=mevcutId?Store.update('transactions',mevcutId,rec):Store.add('transactions',rec);
     return {ok:true,mesaj:'Kaydedildi',kayit};
@@ -4463,6 +4500,7 @@ const Islem={
     if(!g.clientId)return {ok:false,hata:'Danışan seçin',alan:'clientId'};
     if(!(Number(g.sessions)>1))return {ok:false,hata:'Seans sayısı en az 2 olmalı',alan:'sessions'};
     if(!(Number(g.price)>0))return {ok:false,hata:'Fiyat girin',alan:'price'};
+    const th=Islem.tarihDenetle(g.date);if(th)return th;
     const t=Store.find('packages',g.packageId);
     const tur=g.tur==='cift'||g.tur==='bireysel'?g.tur:paketTuru(t);
     let sale,odeme;
@@ -4485,6 +4523,7 @@ const Islem={
     if(!s)return {ok:false,hata:'Paket bulunamadı'};
     if(s.iptal)return {ok:false,hata:'Bu paket zaten iptal edildi'};
     if(!Store.saleUsage(s).remaining)return {ok:false,hata:'Paketin bütün seansları kullanıldı'};
+    const th=Islem.tarihDenetle(g.tarih,'tarih');if(th)return th;
     const kullanilmayan=Store.paketKullanilmayan(s);
     const iade=g.iade===''||g.iade==null?0:Number(g.iade);
     if(!(iade>=0)||iade>kullanilmayan)return {ok:false,hata:'İade 0 ile '+money(kullanilmayan)+' arasında olmalı',alan:'iade'};
@@ -4538,11 +4577,28 @@ const Islem={
   /* Ayarlar > Genel > Kaydet (V-S1). g: {clinicName,assistantName,defaultFee,inactiveWeeks,debtWarn,waTemplate} HAM değerler.
      Ayar nesnesi İŞLEM ANINDA Store.data.settings'ten okunur (eşitleme Store.data'yı yeni nesneyle değiştirebilir;
      ekran kurulurken yakalanan nesne bayatlayabilir). */
+  /* Genel ayar doğrulaması (dört göz 2. tur B3): ücretler boş olabilir (→ 0) ama negatif/sayı olmayan olamaz; "uzaklaştı" haftası
+     1–52 tamsayı; borç uyarı sınırı > 0. Eskiden geçersiz değer sessizce varsayılana (0 / 3 hafta / 3000 ₺) dönüyordu.
+     Hata: {ok:false,hata,alan:<g anahtarı>} · geçerliyse null. View kaydetmeden ÖNCE de çağırır (taslak düşmesin). */
+  ayarlarDogrula(g){
+    const bos=v=>v===''||v==null;
+    for(const [alan,ad] of [['defaultFee','Bireysel seans ücreti'],['coupleFee','Çift terapisi ücreti']]){
+      if(bos(g[alan]))continue;
+      const n=Number(g[alan]);
+      if(!Number.isFinite(n)||n<0)return {ok:false,hata:ad+' sıfır ya da daha büyük bir sayı olmalı',alan};
+    }
+    const h=Number(g.inactiveWeeks);
+    if(bos(g.inactiveWeeks)||!Number.isInteger(h)||h<1||h>52)return {ok:false,hata:'Hafta sayısı 1 ile 52 arasında olmalı',alan:'inactiveWeeks'};
+    const b=Number(g.debtWarn);
+    if(bos(g.debtWarn)||!Number.isFinite(b)||b<=0)return {ok:false,hata:'Borç uyarı sınırı sıfırdan büyük olmalı',alan:'debtWarn'};
+    return null;
+  },
   ayarlarKaydet(g){
+    const hata=Islem.ayarlarDogrula(g);if(hata)return hata;
     Object.assign(Store.data.settings,{clinicName:g.clinicName,assistantName:g.assistantName,defaultFee:Number(g.defaultFee)||0,
       coupleFee:Number(g.coupleFee)||0,paketOneriSablonu:g.paketOneriSablonu||PAKET_ONERI_SABLONU,
       paketHatirlatSablonu:g.paketHatirlatSablonu||PAKET_HATIRLAT_SABLONU,hatirlatSablonu:g.hatirlatSablonu||HATIRLAT_SABLONU,
-      inactiveWeeks:Number(g.inactiveWeeks)||3,debtWarn:Number(g.debtWarn)||3000,waTemplate:g.waTemplate});
+      inactiveWeeks:Number(g.inactiveWeeks),debtWarn:Number(g.debtWarn),waTemplate:g.waTemplate});
     Store.touchSettings();
     return {ok:true,mesaj:'Kaydedildi'};
   },
@@ -5326,7 +5382,7 @@ const TakvimVM={
     return randevular.filter(a=>a.date===d).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
   },
   _ilkAd(a){const c=Store.find('clients',a.clientId);return c?c.name.split(' ')[0]:'?'},
-  _olay(a){return{metin:(a.time?a.time+' ':'')+TakvimVM._ilkAd(a),durum:a.status,randevu:a}},
+  _olay(a){return{metin:(a.time?a.time+' ':'')+TakvimVM._ilkAd(a),durum:a.status,durumEtiket:stLabel(a.status),randevu:a}},
 
   durum(ctx={}){
     const t=ctx.bugun||todayStr();
@@ -5355,7 +5411,7 @@ const TakvimVM={
         /* dar ekran listesi: boş günler atlanır */
         if(l.length)liste.push({tarih:d,baslik:GUNLER[i]+' · '+fmtDShort(d),
           kayitlar:l.map(a=>{const c=Store.find('clients',a.clientId);
-            return{saat:a.time||'—',ad:c?c.name:'?',durum:a.status,randevu:a}})});
+            return{saat:a.time||'—',ad:c?c.name:'?',durum:a.status,durumEtiket:stLabel(a.status),randevu:a}})}); /* A19: durum yalnız renkle belli kalmasın */
       }
       out.hafta={gunler,liste,listeBos:!liste.length,listeBosMetni:'Bu hafta randevu yok'};
     }
@@ -5395,11 +5451,15 @@ const DanisanVM={
 
   /* Üstteki «Danışan ara» (Gökhan 10-22: her ekrandan ulaşılsın): ada (TR küçük harf) ya da iki telefondan birine göre,
      durumdan bağımsız; telefonda boşluk/tire yok sayılır (3+ rakam). En çok 8 sonuç, TR sıralı. */
-  hizliAra(q){
+  _hizliEslesen(q){
     const s=String(q==null?'':q).trim().toLocaleLowerCase('tr');if(!s)return [];
     const r=s.replace(/\D/g,''),tel=p=>r.length>=3&&String(p||'').replace(/\D/g,'').includes(r);
     return Store.col('clients').filter(c=>c.name.toLocaleLowerCase('tr').includes(s)||tel(c.phone)||tel(c.phone2))
-      .sort((a,b)=>a.name.localeCompare(b.name,'tr')).slice(0,8)
+      .sort((a,b)=>a.name.localeCompare(b.name,'tr'));
+  },
+  hizliAraToplam(q){return DanisanVM._hizliEslesen(q).length}, /* 8'e kesilmeden eşleşme sayısı (A12: «ilk 8 gösteriliyor» ipucu) */
+  hizliAra(q){
+    return DanisanVM._hizliEslesen(q).slice(0,8)
       .map(c=>({id:c.id,ad:c.name,bas:initials(c.name),renk:avColor(c.name),alt:c.phone||c.phone2||''}));
   },
 
@@ -5409,8 +5469,9 @@ const DanisanVM={
     const f=DanisanVM.filtre;
     /* Q9: 'borclu' = kalan bakiyesi > 0 olanlar, durumdan BAĞIMSIZ (tamamlanmış danışanın açık borcu da görünür) */
     const uygun=c=>f==='hepsi'||(f==='borclu'?Store.balance(c.id).kalan>0:c.status===f);
+    const rk=q.replace(/\D/g,''),tel=p=>(p||'').includes(q)||(rk.length>=3&&String(p||'').replace(/\D/g,'').includes(rk)); /* A11: «0532 123», «0532-123» da bulur (hızlı aramayla aynı kural) */
     const list=Store.col('clients').filter(c=>uygun(c)&&
-      (!q||c.name.toLocaleLowerCase('tr').includes(q)||(c.phone||'').includes(q)||(c.phone2||'').includes(q)));
+      (!q||c.name.toLocaleLowerCase('tr').includes(q)||tel(c.phone)||tel(c.phone2)));
     list.sort((a,b)=>a.name.localeCompare(b.name,'tr'));
     const satirlar=list.map(c=>{
       const st=Store.clientStats(c.id);const b=Store.balance(c.id);
@@ -5447,7 +5508,7 @@ const DanisanVM={
   /* Q15: silme onayı metni — ileri tarihli (bugünden sonra, planlandı) randevu varsa sayısı söylenir */
   silOnayi(id,bugun){
     const c=Store.find('clients',id);const n=Islem.ileriRandevular(id,bugun).length;
-    return (c?c.name:'Danışan')+' silinsin mi? '+(n?'İleri tarihli '+n+' randevusu da silinir. ':'')+'Geçmişi de gizlenir.';
+    return (c?c.name:'Danışan')+' silinsin mi? Danışan listeden kalkar, sayfası kapanır ve bu ekrandan geri getirilemez. '+(n?'İleri tarihli '+n+' randevusu da silinir. ':'')+'Geçmiş seans ve ödeme kayıtlarına dokunulmaz.';
   },
 
   /* Detay: silinmiş/yok → null; yoksa ekranın çizdiği her şey */
@@ -6083,7 +6144,7 @@ const AyarVM={
 
   /* Görünüm bölümü (E3): seg seçenekleri + bu cihazın seçili teması + alt yazı. Cihaz-yerel; veriye YAZMAZ. */
   gorunumForm(){
-    return {secili:Tema.oku(),secenekler:Tema.secenekler(),
+    return {etiket:'Ekran düzeni',secili:Tema.oku(),secenekler:Tema.secenekler(),
       yardim:'Üst menü yalnız geniş ekranda; telefonda alt sekmeler kalır. Seçim yalnız bu cihaza uygulanır.',
       bildirim:'Görünüm değişti'};
   },
@@ -6120,7 +6181,7 @@ const AyarVM={
       adimlarKendi:["Diğer cihazınızın kamerasıyla QR'ı okutun.","Açılan sayfada ekrandaki kodu yazın.","Kendi parolanızı girin."],
       kodEtiket:'Davet kodu',
       kodNotu:"Bu kod QR'ın içinde değildir; QR'ı gönderdiğiniz yoldan ayrı bir yolla (yüz yüze ya da telefonla) iletin.",
-      kopyala:'Bağlantıyı kopyala',kopyalandi:'Bağlantı kopyalandı',kopyalanamadi:'Kopyalanamadı — bağlantıyı metin kutusundan seçip kopyalayın',
+      kopyala:'Bağlantıyı kopyala',kopyalandi:'Bağlantı kopyalandı',kopyalanamadi:'Kopyalanamadı — bağlantıyı metin kutusundan seçip kopyalayın',qrEtiket:'Davet bağlantısının QR kodu',
       qrYok:'QR çizilemedi — bağlantıyı kopyalayıp telefona gönderin.',
       yerel:"Bu adres yalnız bu bilgisayarda çalışır; QR'ı panel yayınlandıktan sonra (GitHub Pages adresinden) üretin.",
       kapat:'Kapat'},
@@ -6131,7 +6192,7 @@ const AyarVM={
     parola:{baslik:'Parolanız',
       aciklamaSena:"Bu yalnız sizin parolanız; Ketty'nin parolasını değiştirmez. Diğer cihazlarınız eşitlendikten sonra yeni parolayı ister.",
       aciklamaKetty:"Bu yalnız sizin parolanız; Sena'nınkini değiştirmez.",
-      alan:'Yeni parola',yer:'yeni parola',dugme:'Değiştir'},
+      alan:'Yeni parola',yer:'yeni parola',tekrar:'Yeni parolayı tekrar yazın',tekrarYer:'yeni parolayı tekrar yazın',dugme:'Değiştir'},
     kategori:{gelir:'Gelir kategorileri',gider:'Ofis gider kategorileri',kisisel:'Kişisel harcama kategorileri',yardim:'virgülle ayırın'}
   },
   _kullanici(ctx){return (ctx&&ctx.user)||Store.user},
@@ -6180,7 +6241,7 @@ const AyarVM={
       gecerlilik:this.gecerlilikMetni(sonuc.son,ctx&&ctx.simdi),
       url:sonuc.url,
       yerelUyari:ctx&&ctx.yerel?D.yerel:null,
-      kopyala:D.kopyala,kopyalandi:D.kopyalandi,kopyalanamadi:D.kopyalanamadi,qrYok:D.qrYok,kapat:D.kapat};
+      kopyala:D.kopyala,kopyalandi:D.kopyalandi,kopyalanamadi:D.kopyalanamadi,qrYok:D.qrYok,qrEtiket:D.qrEtiket,kapat:D.kapat};
   },
 
   /* «Yeni kurtarma kodu üret» (yalnız Sena) + onay metinleri → {etiket, aciklama, bekleme, onay:{baslik,mesaj,evet}} | null */
@@ -6193,7 +6254,7 @@ const AyarVM={
   /* Parola bölümü metinleri (her kullanıcı yalnız KENDİ parolasını değiştirir) */
   parolaBolumu(ctx){
     const P=this.M.parola;
-    return {baslik:P.baslik,aciklama:this.sahipMi(ctx)?P.aciklamaSena:P.aciklamaKetty,alan:P.alan,yer:P.yer,dugme:P.dugme};
+    return {baslik:P.baslik,aciklama:this.sahipMi(ctx)?P.aciklamaSena:P.aciklamaKetty,alan:P.alan,yer:P.yer,tekrar:P.tekrar,tekrarYer:P.tekrarYer,dugme:P.dugme};
   },
 
   /* Kategori kutuları: hangi kutu kime görünür + başlangıç değeri. Kişisel kutu yalnız Gizlilik.kisiselGorur(user) olana
@@ -6295,7 +6356,7 @@ const KilitVM={
     davetSena:{alt:'Bu cihazı eklemek için parolanızı yazın.',etiket:'Parolanız',ipucu:'Diğer cihazınızda kullandığınız parola',dugme:'Cihazı ekle',bekleme:'Ekleniyor…'},
     kartBaslik:'Kurtarma kodunuz',
     kartAciklama:'Parolanızı unutursanız verilerinize yalnız bu kodla ulaşabilirsiniz. Kâğıda yazıp güvenli bir yerde saklayın.',
-    kartDugme:'Yazdım, devam',kopyala:'Kodu kopyala',kopyalandi:'Kopyalandı',
+    kartDugme:'Yazdım, devam',kopyala:'Kodu kopyala',kopyalandi:'Kopyalandı',kopyalanamadi:'Kopyalanamadı — kodu seçip kopyalayın',
     bilinmeyenHata:'Bir sorun oluştu — tekrar deneyin'
   },
 
@@ -6366,7 +6427,7 @@ const KilitVM={
     const n=Kasa.kodNormalize(kod),ham=n||String(kod).replace(/[\s-]+/g,'');
     const gruplar=ham.match(/.{1,4}/g)||[];
     const M=KilitVM.M;
-    return {baslik:M.kartBaslik,gruplar,kod:gruplar.join('-'),aciklama:M.kartAciklama,dugme:M.kartDugme,kopyala:M.kopyala,kopyalandi:M.kopyalandi};
+    return {baslik:M.kartBaslik,gruplar,kod:gruplar.join('-'),aciklama:M.kartAciklama,dugme:M.kartDugme,kopyala:M.kopyala,kopyalandi:M.kopyalandi,kopyalanamadi:M.kopyalanamadi};
   }
 };
 /* ==== vm_formlar.js ==== */
@@ -6377,6 +6438,9 @@ const FormVM={
 
   /* Q12: eylem adları TEK sözlük — aynı iş her yerde (düğme, pencere başlığı, hızlı işlem menüsü) aynı adla anılır.
      View'lar adı BURADAN okur; yeni bir ad gerekirse buraya eklenir, view'a gömülmez. */
+  /* tahsilat penceresi «Para iadesi» seçilince (dört göz 2. tur B5): başlık + kaydet düğmesi iade olarak okunur. ADLAR'a girmez (o sözlük kilitli). */
+  IADE_ADLARI:{baslik:'Para iadesi',dugme:'İadeyi kaydet'},
+
   ADLAR:{
     tahsilat:'Tahsilat al',
     duzeltme:'Düzeltme (borç / indirim)',
@@ -6507,7 +6571,7 @@ const FormVM={
     if(!clientId)return {metin:'',tutar:null};
     const b=Store.balance(clientId);
     if(b.kalan<0)return {metin:'Danışanın avansı: '+money(-b.kalan)+' — iade edilecek tutar',tutar:String(-b.kalan)};
-    return {metin:'Bu danışanın avansı yok — iade bakiyeyi borca çevirir',tutar:null};
+    return {metin:'Bu danışanın avansı yok — iade bakiyeyi borca çevirir',tutar:null,uyari:true};
   },
 
   /* K3.2: danışan seçilince/değişince tahsilat tutar alanının alacağı değer.
@@ -6616,8 +6680,19 @@ function genislikIzle(wrap,ciz,varsayilan){
 /* ortak ipucu (tooltip) */
 function makeTip(container){
   const tip=h('div.viz-tip');container.appendChild(tip);
+  let zaman=null;
   return{
+    /* A18: fare üstünde gezinir, DOKUNMATİKTE dokununca açılır (pointerdown) ve parmak kalkınca 2,5 sn görünür kalır */
+    bagla(el,goster){
+      el.addEventListener('pointermove',goster);
+      el.addEventListener('pointerdown',goster);
+      el.addEventListener('pointerleave',ev=>{
+        if(ev&&ev.pointerType==='touch'){clearTimeout(zaman);zaman=setTimeout(()=>{tip.style.opacity=0},2500)}
+        else tip.style.opacity=0;
+      });
+    },
     show(x,y,title,rows){
+      clearTimeout(zaman);
       tip.innerHTML='';
       const t=h('div.t');t.textContent=title;tip.appendChild(t);
       for(const r of rows){
@@ -6710,8 +6785,7 @@ function columnChart(opts){
       tip.show(px,padT/Hh*rect.height,opts.tipTitle?opts.tipTitle(i):lb,
         series.map(sr=>({color:sr.color,label:sr.name,value:fmt(sr.values[i]||0)})));
     };
-    hit.addEventListener('pointermove',enter);
-    hit.addEventListener('pointerleave',()=>tip.hide());
+    tip.bagla(hit,enter);
     svg.appendChild(hit);
   });
   holder.innerHTML='';holder.appendChild(svg);
@@ -6783,12 +6857,11 @@ function heatmap(matrix,days,hours,maxCount){
     hours.forEach((hr,j)=>{
       const v=matrix[i][j]||0;
       const rect=sv('rect',{x:padL+j*cw+1,y:padT+i*ch+1,width:cw-2,height:ch-2,rx:5,fill:colorFor(v),class:'heat-cell'});
-      rect.addEventListener('pointermove',()=>{
+      tip.bagla(rect,()=>{
         const r=wrap.getBoundingClientRect();
         tip.show((padL+j*cw+cw/2)/W*r.width,(padT+i*ch)/Hh*r.height,dy+' '+hr+':00',
           [{color:'var(--seq5)',label:'seans',value:num(v)}]);
       });
-      rect.addEventListener('pointerleave',()=>tip.hide());
       svg.appendChild(rect);
     });
   });
@@ -6987,6 +7060,11 @@ const UI={
       if(g&&n>0){this.yutulacakGeri++;g.go(-n)}
     },0);
   },
+  /* üstteki geri düğmesi: önceki ekrana (tarayıcı geçmişi); geçmiş yoksa yedek ekrana */
+  geri(yedek){
+    const g=this.gecmis();
+    if(g&&g.length>1)g.back();else this.go(yedek);
+  },
   ustModal(){
     this.acik=this.acik.filter(k=>k.bg.isConnected!==false); /* #modals dışarıdan boşaltıldıysa ölü kayıtları at */
     return this.acik[this.acik.length-1]||null;
@@ -7016,7 +7094,7 @@ const UI={
   },
 
   /* dolu pencereden çıkış onayı (geri tuşu + Esc ortak yolu) */
-  cikisSor(ust){this.onay('Çıkılsın mı?','Kaydedilmemiş değişiklik var — çıkılsın mı?','Evet, çık',()=>ust.kapat(false))},
+  cikisSor(ust){this.onay('Çıkılsın mı?','Kaydedilmemiş değişiklik var — çıkılsın mı?','Evet, çık',()=>ust.kapat(false),{tehlikeli:true})},
 
   /* klavye: Esc en üstteki pencereyi kapatır; Tab/Shift+Tab pencere içinde döner */
   odaklanabilirler(m){
@@ -7039,10 +7117,33 @@ const UI={
     const t=$('#toasts');if(t)t.setAttribute('aria-live','polite');
     document.addEventListener('keydown',e=>this.tus(e));
     window.addEventListener('popstate',e=>this.geriTusu(e.state));
+    this.sonMobil=this.mobilMi();
+    let zaman=null; /* A17: yalnız telefon↔masaüstü kırılımı GEÇİLİNCE (döndürme dahil), kaydırmayı bitirdikten sonra çiz */
+    window.addEventListener('resize',()=>{clearTimeout(zaman);zaman=setTimeout(()=>this.kirilimKontrol(),150)});
+  },
+  KIRILIM:900,sonMobil:null,
+  mobilMi(){return window.innerWidth<=this.KIRILIM},
+  /* kırılım geçildiyse yeniden çizer (taslak varsa çizimi erteler); geçilmediyse hiçbir şey yapmaz. Çizim yapıldı/ertelendi mi döner. */
+  kirilimKontrol(){
+    const m=this.mobilMi();if(m===this.sonMobil)return false;
+    this.sonMobil=m;
+    const app=$('#app');if(!app||!app.classList.contains('ready'))return false; /* kilit ekranında ekran çizilmez */
+    if(this.taslakVar()){this.bekleyenCizim=true;return true}
+    this.render();return true;
   },
 
   /* tıklanabilir div/satır: klavyeyle de çalışsın (role=button, Tab, Enter/Boşluk) */
-  tiklanir(el,fn){
+  /* opts.ad (A9): satırın İÇİNDE başka düğme/bağlantı varsa satır role=button OLMAZ (iç içe etkileşimli öğe okuyucuda
+     bozuk okunur); bunun yerine satırın adı olan öğe (ad) GERÇEK düğme olur — Tab/Enter onda çalışır, fare/dokunmayla
+     satırın her yerine tıklamak eskisi gibi fn'i çağırır (düğmenin tıkı satıra kabarır; iç düğmeler stopPropagation yapar). */
+  tiklanir(el,fn,opts){
+    const ad=opts&&opts.ad;
+    if(ad){
+      const metin=ad.textContent;ad.textContent='';
+      const d=h('button.satir-ad',{type:'button'});d.textContent=metin;ad.appendChild(d);
+      el.addEventListener('click',fn);
+      return el;
+    }
     el.setAttribute('role','button');el.setAttribute('tabindex','0');
     el.addEventListener('click',fn);
     el.addEventListener('keydown',e=>{
@@ -7102,7 +7203,18 @@ const UI={
     const yeni=!this.sonEkran||this.sonEkran.view!==this.view||this.sonEkran.param!==this.param;
     this.sonEkran={view:this.view,param:this.param};
     if(yeni)window.scrollTo(0,0);
+    this.ekranBasligi(main,yeni);
   },
+  /* A15: sekme başlığı «<Ekran> · Sena Panel»; ekran DEĞİŞİNCE odak ekran başlığına (okuyucu yeni ekranı duyar). Açık pencere varsa odak çalınmaz. */
+  ekranBasligi(main,yeni){
+    const h1=main.querySelector?main.querySelector('h1'):null;
+    const ad=(h1&&h1.textContent)||(this.EKRAN_ADLARI[this.view]);
+    if(ad)document.title=ad+' · Sena Panel';
+    if(!yeni||!h1||this.acik.length)return;
+    h1.setAttribute('tabindex','-1');
+    if(h1.focus)h1.focus({preventScroll:true});
+  },
+  EKRAN_ADLARI:{dash:'Ana Ekran',cal:'Randevular',clients:'Danışanlar',hatir:'Hatırlatmalar',fin:'Finans',rep:'Raporlar',set:'Ayarlar'},
   sonEkran:null,             /* en son çizilen {view,param} */
 
   /* yan menü / tabbar'da aktif ekranın düğmesini işaretle (render ve shell kullanır) */
@@ -7129,7 +7241,7 @@ const UI={
     brand.appendChild(bt);sb.appendChild(brand);
     const araB=h('button.btn.ghost.ara-dugme',{onclick:()=>this.danisanAra()});
     araB.appendChild(icon('search'));araB.appendChild(document.createTextNode('Danışan ara'));sb.appendChild(araB);
-    const nav=h('div.nav');
+    const nav=h('div.nav',{role:'navigation','aria-label':'Ana menü'});
     NAV.forEach(([v,lbl,ic])=>{
       const b=h('button',{dataset:{v},onclick:()=>this.go(v)});
       b.appendChild(icon(ic));b.appendChild(document.createTextNode(lbl));
@@ -7164,7 +7276,7 @@ const UI={
     const tb=$('#tabbar');tb.innerHTML='';
     NAV.filter(([v])=>v!=='hatir'&&v!=='set').forEach( /* telefonda Hatırlatmalar: Danışanlar ve Ana Ekran'daki bağlantıdan */([v,lbl,ic])=>{
       const b=h('button',{dataset:{v},onclick:()=>this.go(v)});
-      b.appendChild(icon(ic));b.appendChild(h('span',{},lbl.split(' ')[0]));
+      b.appendChild(icon(ic));b.appendChild(h('span',{},lbl)); /* A8: «Ana Ekran» artık «Ana» diye kesilmez */
       tb.appendChild(b);
     });
     const fab=$('#fab');fab.innerHTML='';fab.appendChild(icon('plus'));fab.setAttribute('aria-label',FormVM.ADLAR.hizliIslem);
@@ -7184,12 +7296,13 @@ const UI={
       const sb=h('div.searchbox',{style:'max-width:none'});sb.appendChild(icon('search'));
       const inp=h('input',{type:'search',placeholder:'İsim veya telefon…','aria-label':'Danışan ara',autocomplete:'off'});
       sb.appendChild(inp);m.appendChild(sb);
-      const liste=h('div',{style:'margin-top:10px'});m.appendChild(liste);
+      const liste=h('div',{style:'margin-top:10px','aria-live':'polite'});m.appendChild(liste); /* A12: sonuç değişince okuyucu duyar */
       let sonuc=[];
       const ac=id=>{close();this.go('clients',id)};
       const ciz=()=>{
         sonuc=DanisanVM.hizliAra(inp.value);liste.innerHTML='';
         if(inp.value.trim()&&!sonuc.length)liste.appendChild(h('div.muted',{style:'padding:10px 4px'},'Eşleşen danışan yok'));
+        const toplam=DanisanVM.hizliAraToplam(inp.value);
         sonuc.forEach(s=>{
           const row=this.tiklanir(h('div.row.click'),()=>ac(s.id));
           const av=h('div.av');av.style.background=s.renk;av.textContent=s.bas;row.appendChild(av);
@@ -7197,6 +7310,7 @@ const UI={
           if(s.alt){const sm=h('small.muted',{style:'display:block'});sm.textContent=s.alt;tx.appendChild(sm)}
           row.appendChild(tx);liste.appendChild(row);
         });
+        if(toplam>sonuc.length)liste.appendChild(h('div.muted',{style:'padding:8px 4px;font-size:12.5px'},'İlk '+sonuc.length+' sonuç gösteriliyor ('+toplam+' eşleşme) — aramayı daraltın'));
       };
       /* arama yazmak «değişiklik» sayılmasın: dışarı dokununca pencere kapanabilsin */
       inp.addEventListener('input',e=>{e.stopPropagation();ciz()});
@@ -7242,6 +7356,26 @@ const UI={
     const inp=m.querySelector('input,select');if(inp&&window.innerWidth>900)setTimeout(()=>inp.focus(),150);
     return close;
   },
+  /* A14: tam sayfa katman (muhasebe özeti): modal gibi davranır — role=dialog, Esc ve geri tuşu kapatır, Tab içeride döner,
+     kapanınca odak açan öğeye döner. Döndürdüğü işlev katmanı kapatır. */
+  sayfaAc(sheet,ad){
+    const onceki=document.activeElement;
+    let kapandi=false;
+    const kayit={bg:sheet,m:sheet,kirli:()=>false,kayitli:false,kapat:null};
+    const kapat=geriden=>{
+      if(kapandi)return;kapandi=true;
+      const i=this.acik.indexOf(kayit);if(i>=0)this.acik.splice(i,1);
+      sheet.classList.remove('open');
+      if(kayit.kayitli&&!geriden)this.geriIste();
+      if(!this.ustModal()&&onceki&&onceki!==document.body&&onceki.isConnected&&onceki.focus)onceki.focus({preventScroll:true});
+    };
+    kayit.kapat=kapat;
+    sheet.setAttribute('role','dialog');sheet.setAttribute('aria-modal','true');sheet.setAttribute('aria-label',ad);sheet.setAttribute('tabindex','-1');
+    this.acik.push(kayit);kayit.kayitli=this.gecmisPush({sena:'modal'});
+    sheet.classList.add('open');
+    sheet.focus({preventScroll:true});
+    return ()=>kapat(false);
+  },
   confirm(msg,onYes){
     this.modal('Emin misiniz?',(m,close)=>{
       m.appendChild(h('p',{style:'color:var(--ink-2);font-size:14px'},msg));
@@ -7253,12 +7387,14 @@ const UI={
   },
 
   /* silme dışı onay (D3): başlık, ileti ve onay düğmesi metni verilir; Vazgeç hiçbir şey yapmaz */
-  onay(baslik,msg,evetMetni,onYes){
+  /* son parametre {tehlikeli:true}: onay düğmesi kırmızı (geri alınamaz işler — «Evet, çık», yedekten geri yükleme) */
+  onay(baslik,msg,evetMetni,onYes,secenek){
+    const tehlikeli=!!(secenek&&secenek.tehlikeli);
     this.modal(baslik,(m,close)=>{
       m.appendChild(h('p',{style:'color:var(--ink-2);font-size:14px'},msg));
       const acts=h('div.actions');
       acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
-      acts.appendChild(h('button.btn',{onclick:()=>{close();onYes()}},evetMetni));
+      acts.appendChild(h('button.btn'+(tehlikeli?'.danger':''),{onclick:()=>{close();onYes()}},evetMetni));
       m.appendChild(acts);
     },{sinif:'onay'});
   },
@@ -7296,8 +7432,9 @@ const UI={
     });
     return s;
   },
-  seg(options,value,onSel){
+  seg(options,value,onSel,adi){ /* adi (A13): grup adı — okuyucu «Danışan süzgeci, grup» der; alan içinde UI.field etiketle adlandırır */
     const wrap=h('div.seg');
+    if(adi){wrap.setAttribute('role','group');wrap.setAttribute('aria-label',adi)}
     options.forEach(o=>{
       const[v,lbl]=Array.isArray(o)?o:[o,o];
       const on=String(v)===String(value);
@@ -7372,18 +7509,31 @@ const UI={
 /* Kayıt formları — randevu, tahsilat, gelir/gider, danışan, tekrarlayan */
 const Forms={
 
+  /* «Parolayı göster/gizle» düğmesi — kilit ekranı, Ayarlar parola değiştirme ve gate formları AYNI yardımcıyı kullanır.
+     alanlar: parola input'ları (hepsi birden çevrilir). Durum etiketle söylenir (aria-pressed YOK: etiket + basılı durum çift anlam olurdu). */
+  parolaGoster(alanlar){
+    let acik=false;
+    const b=h('button.btn.ghost.sm.gate-goster',{type:'button',style:'margin:0 0 12px'},'Parolayı göster');
+    b.addEventListener('click',()=>{
+      acik=!acik;
+      b.textContent=acik?'Parolayı gizle':'Parolayı göster';
+      alanlar.forEach(a=>{a.type=acik?'text':'password'});
+    });
+    return b;
+  },
+
   /* ---------- danışan ---------- */
   client(existing,onDone){
     const c=existing||{};
     UI.modal(existing?'Danışanı düzenle':FormVM.ADLAR.danisanEkle,(m,close)=>{
-      const name=UI.input({value:c.name||'',placeholder:'Ad Soyad'});
-      const phone=UI.input({value:c.phone||'',placeholder:'05xx xxx xx xx',type:'tel'});
-      const phone2=UI.input({value:c.phone2||'',placeholder:'İsteğe bağlı',type:'tel'});
+      const name=UI.input({value:c.name||'',placeholder:'Ad Soyad',autocomplete:'off'});
+      const phone=UI.input({value:c.phone||'',placeholder:'05xx xxx xx xx',type:'tel',autocomplete:'off'});
+      const phone2=UI.input({value:c.phone2||'',placeholder:'İsteğe bağlı',type:'tel',autocomplete:'off'});
       const fee=UI.input({value:c.fee!=null?c.fee:turUcreti(c.tur),type:'number',inputmode:'numeric'});
       /* seans türü (Sena 10-29): tür değişince ücret, elle yazılmadıysa o türün standart ücretine geçer */
       let feeElle=false;fee.addEventListener('input',()=>{feeElle=true});
       const tur=UI.seg(SEANS_TURLERI,c.tur||'bireysel',v=>{if(!feeElle)fee.value=turUcreti(v)});
-      const birth=UI.input({value:c.birthDate||'',type:'date'});
+      const birth=UI.input({value:c.birthDate||'',type:'date',autocomplete:'off'});
       const source=UI.select(['','Tavsiye','Instagram','Google','Web sitesi','Kurum','Diğer'].map(x=>[x,x||'—']),c.source||'');
       const status=UI.seg([['aktif','Aktif'],['pasif','Ara verdi'],['tamamlandi','Tamamlandı']],c.status||'aktif');
       const notes=h('textarea',{placeholder:'Kısa not (şifreli saklanır)'});notes.value=c.notes||'';
@@ -7448,8 +7598,8 @@ const Forms={
       m.appendChild(UI.field('Danışan',client));
       /* — listede olmayan danışanı buradan ekle — */
       let newMode=false;
-      const nName=UI.input({placeholder:'Ad Soyad'});
-      const nPhone=UI.input({placeholder:'05xx xxx xx xx',type:'tel'});
+      const nName=UI.input({placeholder:'Ad Soyad',autocomplete:'off'});
+      const nPhone=UI.input({placeholder:'05xx xxx xx xx',type:'tel',autocomplete:'off'});
       const newBox=h('div.hide',{style:'background:var(--brand-soft);border-radius:13px;padding:12px 13px 4px;margin:-6px 0 13px'});
       const nfr=h('div.frow');
       nfr.appendChild(UI.field('Yeni danışanın adı',nName));
@@ -7485,12 +7635,12 @@ const Forms={
           yeniDanisan:newMode?{name:nName.value,phone:nPhone.value}:null};
         const kaydet=()=>{
           const r=Islem.randevuKaydet(g,existing&&existing.id);
-          if(!r.ok)return UI.formHatasi(m,r,{clientId:client,yeniAd:nName});
+          if(!r.ok)return UI.formHatasi(m,r,{clientId:client,yeniAd:nName,date});
           close();UI.toast(r.mesaj,'ok');UI.render();onDone&&onDone();
         };
         /* KUL2: dolu saate randevu → engelleme, onay iste (Vazgeç forma döner); hatalı formda önce hata gösterilir */
         const hata=Islem.randevuDogrula(g);
-        if(hata)return UI.formHatasi(m,hata,{clientId:client,yeniAd:nName});
+        if(hata)return UI.formHatasi(m,hata,{clientId:client,yeniAd:nName,date});
         const o=FormVM.cakismaOnayi(Islem.cakismalar(g,existing&&existing.id));
         if(o)UI.onay(o.baslik,o.mesaj,o.dugme,kaydet);else kaydet();
       }},'Kaydet'));
@@ -7555,9 +7705,15 @@ const Forms={
          kullanıcı tutarı kendi yazdıysa danışan değişince üzerine yazılmaz */
       let elleGirildi=false;
       amount.addEventListener('input',()=>{elleGirildi=true});
+      const baslikEl=m.querySelector('h2 span'),kaydetBtn=h('button.btn',{},'Kaydet');
       const showBal=ilk=>{
         const iade=tur.dataset.value==='iade';
-        balInfo.textContent=(iade?FormVM.iadeBakiyesi(client.value):FormVM.tahsilatBakiyesi(client.value)).metin;
+        const b=iade?FormVM.iadeBakiyesi(client.value):FormVM.tahsilatBakiyesi(client.value);
+        balInfo.textContent=b.metin;
+        /* B5: iade seçilince pencere iade olarak okunur; avansı yoksa uyarı belirgin (bakiyeyi borca çevirir) */
+        if(baslikEl)baslikEl.textContent=iade?FormVM.IADE_ADLARI.baslik:FormVM.ADLAR.tahsilat;
+        kaydetBtn.textContent=iade?FormVM.IADE_ADLARI.dugme:'Kaydet';
+        balInfo.style.color=b.uyari?'var(--warn)':'';balInfo.style.fontWeight=b.uyari?'650':'';
         if(ilk&&amount.value)return; /* açılışta çağıranın önerdiği tutar korunur */
         amount.value=FormVM.tahsilatTutari(client.value,elleGirildi,amount.value,tur.dataset.value);
       };
@@ -7571,12 +7727,13 @@ const Forms={
       showBal(true);
       const acts=h('div.actions');
       acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
-      acts.appendChild(h('button.btn',{onclick:()=>{
+      kaydetBtn.addEventListener('click',()=>{
         const g={clientId:client.value,amount:amount.value,date:date.value,method:method.dataset.value,note:note.value};
         const r=tur.dataset.value==='iade'?Islem.iadeKaydet(g):Islem.tahsilatKaydet(g);
-        if(!r.ok)return UI.formHatasi(m,r,{clientId:client,amount});
+        if(!r.ok)return UI.formHatasi(m,r,{clientId:client,amount,date});
         close();UI.toast(r.mesaj,'ok');UI.render();onDone&&onDone();
-      }},'Kaydet'));
+      });
+      acts.appendChild(kaydetBtn);
       m.appendChild(acts);
     });
   },
@@ -7597,7 +7754,7 @@ const Forms={
       acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
       acts.appendChild(h('button.btn.danger',{onclick:()=>{
         const r=Islem.paketIptal(saleId,{iade:iade.value,tarih:todayStr(),method:method.dataset.value});
-        if(!r.ok)return UI.formHatasi(m,r,{iade});
+        if(!r.ok)return UI.formHatasi(m,r,{iade,tarih:iade});
         close();UI.toast(r.mesaj,'ok');UI.render();
       }},'Paketi iptal et'));
       m.appendChild(acts);
@@ -7621,7 +7778,7 @@ const Forms={
       acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
       acts.appendChild(h('button.btn',{onclick:()=>{
         const r=Islem.duzeltmeKaydet({clientId:client.value,amount:FormVM.duzeltmeTutari(tur.dataset.value,amount.value),date:date.value,note:note.value});
-        if(!r.ok)return UI.formHatasi(m,r,{clientId:client,amount});
+        if(!r.ok)return UI.formHatasi(m,r,{clientId:client,amount,date});
         close();UI.toast(r.mesaj,'ok');UI.render();
       }},'Kaydet'));
       m.appendChild(acts);
@@ -7656,7 +7813,7 @@ const Forms={
       acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
       acts.appendChild(h('button.btn',{onclick:()=>{
         const r=Islem.islemKaydet({type:t.type,category:cat.value,amount:amount.value,date:date.value,note:note.value},existing&&existing.id);
-        if(!r.ok)return UI.formHatasi(m,r,{amount});
+        if(!r.ok)return UI.formHatasi(m,r,{amount,date});
         close();UI.toast(r.mesaj,'ok');UI.render();onDone&&onDone();
       }},'Kaydet'));
       m.appendChild(acts);
@@ -7739,7 +7896,7 @@ const Forms={
     UI.modal('WhatsApp mesajı — '+c.name,(m,close)=>{
       const b=FormVM.paketOneriBaslangic(clientId);
       const kalip=UI.seg([['yalniz','Yalnız hatırlatma'],['hatirlat','Hatırlatma + paket'],['oneri','Yalnız paket']],
-        tur||(d&&!d.hatirlat?'oneri':'hatirlat'),()=>{msgElle=false;yenile()});
+        tur||(d&&!d.hatirlat?'oneri':'hatirlat'),()=>yenile()); /* B4: elle düzenlenmiş mesaj tür değişince silinmez; «Kalıba dön» ile kalıp geri yazılır */
       const paketKutu=h('div');
       const tpls=Store.col('packages').filter(p=>paketTuru(p)===(c.tur==='cift'?'cift':'bireysel'));
       const tpl=UI.select([['','Özel paket'],...tpls.map(p=>[p.id,paketEtiketi(p)])],b.packageId);
@@ -7747,7 +7904,8 @@ const Forms={
       const price=UI.input({value:b.price,type:'number',inputmode:'numeric'});
       const prev=h('div.alert.info',{style:'margin-bottom:12px'});
       const msg=h('textarea',{rows:6});
-      let msgElle=false;msg.addEventListener('input',()=>{msgElle=true});
+      let msgElle=false;msg.addEventListener('input',()=>{msgElle=true;kalibaDon.classList.remove('hide')});
+      const kalibaDon=h('button.btn.ghost.sm.hide',{type:'button',style:'margin-top:6px',onclick:()=>{msgElle=false;kalibaDon.classList.add('hide');yenile()}},'Kalıba dön');
       const yenile=()=>{
         const yalniz=kalip.dataset.value==='yalniz';
         paketKutu.classList.toggle('hide',yalniz);
@@ -7762,18 +7920,25 @@ const Forms={
       if(tpls.length)paketKutu.appendChild(UI.field('Paket',tpl));
       const fr=h('div.frow');fr.appendChild(UI.field('Seans sayısı',sessions));fr.appendChild(UI.field('Paket fiyatı (₺)',price));
       paketKutu.appendChild(fr);paketKutu.appendChild(prev);m.appendChild(paketKutu);
-      m.appendChild(UI.field('Mesaj',msg,'gönderilmeden önce düzenleyebilirsiniz · kalıp Ayarlar → Genel\'den değişir'));
+      const msgAlan=UI.field('Mesaj',msg,'gönderilmeden önce düzenleyebilirsiniz · kalıp Ayarlar → Genel\'den değişir');
+      msgAlan.appendChild(kalibaDon);m.appendChild(msgAlan);
       yenile();
       const acts=h('div.actions');
       acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
       const yalniz=()=>kalip.dataset.value==='yalniz';
-      const eksik=()=>!yalniz()&&(!(Number(sessions.value)>1)||!(Number(price.value)>0));
+      /* eksik seans/fiyat: pencere içinde alan işaretli hata (toast tek başına yetmiyordu) */
+      const eksikHata=()=>{
+        if(yalniz())return null;
+        if(!(Number(sessions.value)>1))return {ok:false,hata:'Seans sayısı en az 2 olmalı',alan:'sessions'};
+        if(!(Number(price.value)>0))return {ok:false,hata:'Fiyat girin',alan:'price'};
+        return null;
+      };
       /* temas kaydı: yalnız hatırlatma → «ulaşıldı» + temas (Raporlar → Geri kazanım); paketli → paket önerisi kaydı da */
       const temasKaydet=()=>yalniz()?Islem.ulasildiIsaretle(clientId)
         :Islem.paketOneriGonderildi(clientId,{sessions:sessions.value,price:price.value,hatirlat:kalip.dataset.value==='hatirlat'});
       if(c.phone){
         const wa=h('button.btn',{onclick:()=>{
-          if(eksik())return UI.toast('Seans sayısı ve fiyat girin','err');
+          const e=eksikHata();if(e)return UI.formHatasi(m,e,{sessions,price});
           window.open(waLink(c.phone,msg.value),'_blank');
           const r=temasKaydet();
           close();UI.toast(yalniz()?'Hatırlatma WhatsApp\'ta açıldı':r.mesaj,'ok');UI.render();
@@ -7782,9 +7947,14 @@ const Forms={
       }else{
         /* telefonsuz danışan (Gökhan 10-29): kopyalamak gönderdi demek değil — temas ancak «Gönderdim» onayıyla yazılır,
            gönderilmeyen mesaj rapora sonuçsuz temas olarak düşmesin */
-        acts.appendChild(h('button.btn',{onclick:()=>{
-          if(eksik())return UI.toast('Seans sayısı ve fiyat girin','err');
-          try{navigator.clipboard.writeText(msg.value)}catch(e){}
+        acts.appendChild(h('button.btn',{onclick:async()=>{
+          const e=eksikHata();if(e)return UI.formHatasi(m,e,{sessions,price});
+          /* B4: kopyalama gerçekten başarılı olmadan pencere kapanmaz (yoksa «Mesaj kopyalandı» yalanı + kaybolan metin) */
+          try{await navigator.clipboard.writeText(msg.value)}
+          catch(err){
+            if(msg.focus)msg.focus();if(msg.select)msg.select();
+            return UI.formHatasi(m,{ok:false,hata:'Kopyalanamadı — mesajı seçip kopyalayın'});
+          }
           close();
           UI.onay('Mesaj kopyalandı','Danışanın kayıtlı telefonu yok. Mesajı kendi telefonunuzdan gönderdiyseniz «Gönderdim»e basın; Raporlar\'daki geri kazanım bu temasın sonucunu izler.',
             'Gönderdim',()=>{const r=temasKaydet();UI.toast(r.mesaj,'ok');UI.render()});
@@ -7825,7 +7995,7 @@ const Forms={
       acts.appendChild(h('button.btn',{onclick:()=>{
         const r=Islem.paketSat({clientId:client.value,packageId:tpl.value,sessions:sessions.value,price:price.value,
           date:date.value,method:method.dataset.value,tur:tur.dataset.value});
-        if(!r.ok)return UI.formHatasi(m,r,{clientId:client,sessions,price});
+        if(!r.ok)return UI.formHatasi(m,r,{clientId:client,sessions,price,date});
         close();UI.toast(r.mesaj,'ok');UI.render();
       }},'Sat ve tahsil et'));
       m.appendChild(acts);
@@ -7836,8 +8006,8 @@ const Forms={
   waitlist(existing){
     const w=existing||{};
     UI.modal('Bekleme listesi',(m,close)=>{
-      const name=UI.input({value:w.name||'',placeholder:'Ad Soyad'});
-      const phone=UI.input({value:w.phone||'',placeholder:'05xx…',type:'tel'});
+      const name=UI.input({value:w.name||'',placeholder:'Ad Soyad',autocomplete:'off'});
+      const phone=UI.input({value:w.phone||'',placeholder:'05xx…',type:'tel',autocomplete:'off'});
       const note=UI.input({value:w.note||'',placeholder:'tercih ettiği gün/saat vb.'});
       m.appendChild(UI.field('Ad',name));
       m.appendChild(UI.field('Telefon',phone));
@@ -7851,7 +8021,7 @@ const Forms={
       acts.appendChild(h('button.btn',{onclick:()=>{
         const r=Islem.beklemeKaydet({name:name.value,phone:phone.value,note:note.value},existing&&existing.id);
         if(!r.ok)return UI.formHatasi(m,r,{name});
-        close();UI.render();
+        close();UI.render();UI.toast('Bekleme listesine kaydedildi','ok');
       }},'Kaydet'));
       m.appendChild(acts);
     });
@@ -7906,17 +8076,18 @@ UI.register('dash',main=>{
       return card;
     }
     g.randevular.forEach(r=>{
-      const row=UI.tiklanir(h('div.appt.'+r.durum,{style:'margin-bottom:7px'}),()=>Forms.apptActions(r.randevu));
+      const bb=h('b');bb.textContent=r.ad;
+      const row=UI.tiklanir(h('div.appt.'+r.durum,{style:'margin-bottom:7px'}),()=>Forms.apptActions(r.randevu),r.waGoster?{ad:bb}:undefined); /* WhatsApp bağlantısı varsa satır role=button değil (A9) */
       const tm=h('div',{style:'font-weight:700;font-size:13px;min-width:44px'});tm.textContent=r.saat;
       const bd=h('div',{style:'min-width:0;flex:1'});
-      const bb=h('b');bb.textContent=r.ad;bd.appendChild(bb);
+      bd.appendChild(bb);
       const ss=h('small');ss.textContent=r.altMetin;bd.appendChild(ss);
       row.appendChild(tm);row.appendChild(bd);
       const st=h('span.st.chip.'+r.durumSinif);
       st.textContent=r.durumEtiket;
       row.appendChild(st);
       if(r.waGoster){
-        const wa=h('a.btn.soft.sm',{href:r.waHref,target:'_blank',
+        const wa=h('a.btn.soft.sm',{href:r.waHref,target:'_blank',rel:'noopener',
           onclick:e=>e.stopPropagation(),style:'margin-left:6px;flex-shrink:0','aria-label':'WhatsApp – '+r.ad});
         wa.appendChild(icon('wa'));
         row.appendChild(wa);
@@ -8032,7 +8203,7 @@ UI.register('cal',main=>{
   const nextB=h('button.btn.ghost.icon',{onclick:()=>{TakvimVM.kaydir(1);UI.render()},'aria-label':'Sonraki '+birim});nextB.appendChild(icon('right'));
   const todayB=h('button.btn.ghost.sm',{onclick:()=>{TakvimVM.bugune();UI.render()}},'Bugün');
   const title=h('h2');title.textContent=v.baslik;
-  const seg=UI.seg([['day','Gün'],['week','Hafta'],['month','Ay']],v.mod,m=>{TakvimVM.modSec(m);UI.render()});
+  const seg=UI.seg([['day','Gün'],['week','Hafta'],['month','Ay']],v.mod,m=>{TakvimVM.modSec(m);UI.render()},'Takvim görünümü');
   head.appendChild(prevB);head.appendChild(nextB);head.appendChild(todayB);head.appendChild(title);
   head.appendChild(h('div.grow'));head.appendChild(seg);
   main.appendChild(head);
@@ -8071,7 +8242,7 @@ UI.register('cal',main=>{
       col.appendChild(wd);
       g.olaylar.forEach(o=>{
         const ev=UI.tiklanir(h('div.evt.appt.'+o.durum,{style:'border-left-width:3px'}),()=>Forms.apptActions(o.randevu));
-        ev.textContent=o.metin;
+        ev.textContent=o.metin;ev.setAttribute('aria-label',o.metin+', '+o.durumEtiket); /* A19 */
         col.appendChild(ev);
       });
       col.addEventListener('dblclick',()=>Forms.appointment(null,{date:g.tarih}));
@@ -8088,6 +8259,7 @@ UI.register('cal',main=>{
           const ap=UI.tiklanir(h('div.appt.'+r.durum,{style:'margin-bottom:6px'}),()=>Forms.apptActions(r.randevu));
           const tm=h('div',{style:'font-weight:700;font-size:12.5px;min-width:42px'});tm.textContent=r.saat;
           const bd=h('div',{style:'flex:1;min-width:0'});const bb=h('b');bb.textContent=r.ad;bd.appendChild(bb);
+          ap.setAttribute('aria-label',r.saat+' '+r.ad+', '+r.durumEtiket); /* A19 */
           ap.appendChild(tm);ap.appendChild(bd);card.appendChild(ap);
         });
       });
@@ -8140,10 +8312,11 @@ UI.register('clients',(main,param)=>{
   const ilk=DanisanVM.liste();
   const bar=h('div.flex.mb',{style:'flex-wrap:wrap'});
   const sb=h('div.searchbox');sb.appendChild(icon('search'));
-  const inp=h('input',{placeholder:'İsim veya telefon ara…',value:ilk.arama});
+  const inp=h('input',{type:'search',placeholder:'İsim veya telefon ara…','aria-label':'Danışan ara: isim veya telefon',autocomplete:'off',value:ilk.arama});
   inp.addEventListener('input',()=>{DanisanVM.aramaYaz(inp.value);renderList()});
   sb.appendChild(inp);bar.appendChild(sb);
-  bar.appendChild(UI.seg(ilk.filtreSecenekleri,ilk.filtre,v=>{DanisanVM.filtreSec(v);renderList()}));
+  const fs=UI.seg(ilk.filtreSecenekleri,ilk.filtre,v=>{DanisanVM.filtreSec(v);renderList()},'Danışan süzgeci');
+  bar.appendChild(fs);
   main.appendChild(bar);
 
   const listCard=h('div.card');main.appendChild(listCard);
@@ -8181,9 +8354,10 @@ UI.register('clients',(main,param)=>{
   wh.appendChild(wbtn);wcard.appendChild(wh);
   if(!wl.length){const e=h('div.empty',{style:'padding:12px'});e.textContent='Bekleyen yok — yer açıldığında buradan arayabilirsiniz';wcard.appendChild(e)}
   wl.forEach(w=>{
-    const row=UI.tiklanir(h('div.row.click'),()=>Forms.waitlist(w.kayit));
+    const bb=h('b');bb.textContent=w.ad;
+    const row=UI.tiklanir(h('div.row.click'),()=>Forms.waitlist(w.kayit),{ad:bb}); /* içinde telefon bağlantısı var: satır role=button DEĞİL, ad gerçek düğme */
     const av=h('div.av');av.style.background='var(--line-2)';av.style.color='var(--ink-2)';av.textContent=w.bas;
-    const bd=h('div.body');const bb=h('b');bb.textContent=w.ad;bd.appendChild(bb);
+    const bd=h('div.body');bd.appendChild(bb);
     const ss=h('small');ss.textContent=w.ozet;bd.appendChild(ss);
     row.appendChild(av);row.appendChild(bd);
     if(w.telefon){const cl=h('a.btn.ghost.sm',{href:'tel:'+w.telefon,onclick:e=>e.stopPropagation(),'aria-label':'Ara – '+w.ad});cl.appendChild(icon('phone'));row.appendChild(cl)}
@@ -8200,7 +8374,7 @@ function clientDetail(main,id){
   const top=h('div.topbar');
   const back=h('button.btn.ghost.icon',{onclick:()=>UI.go('clients'),'aria-label':'Danışan listesine dön'});back.appendChild(icon('left'));
   top.appendChild(back);
-  const av=h('div.av',{style:'width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px'});
+  const av=h('div.av',{style:'width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink);font-weight:700;font-size:16px'});
   av.style.background=t.renk;av.textContent=t.bas;
   top.appendChild(av);
   const tt=h('div');
@@ -8217,18 +8391,18 @@ function clientDetail(main,id){
   main.appendChild(top);
 
   /* iletişim + hızlı aksiyonlar */
-  const acts=h('div.flex.mb',{style:'flex-wrap:wrap;gap:8px'});
+  const acts=h('div.flex.mb.det-eylem');
   if(t.telefon){
     const call=h('a.btn.ghost.sm',{href:'tel:'+t.telefon});call.appendChild(icon('phone'));call.appendChild(document.createTextNode(t.telefon));
     acts.appendChild(call);
-    const wa=h('a.btn.soft.sm',{href:t.waLink,target:'_blank'});
+    const wa=h('a.btn.soft.sm',{href:t.waLink,target:'_blank',rel:'noopener'});
     wa.appendChild(icon('wa'));wa.appendChild(document.createTextNode('WhatsApp'));
     acts.appendChild(wa);
   }
   if(t.telefon2){
     const call2=h('a.btn.ghost.sm',{href:'tel:'+t.telefon2});call2.appendChild(icon('phone'));call2.appendChild(document.createTextNode(t.telefon2));
     acts.appendChild(call2);
-    const wa2=h('a.btn.soft.sm',{href:t.waLink2,target:'_blank','aria-label':'WhatsApp – '+t.telefon2});
+    const wa2=h('a.btn.soft.sm',{href:t.waLink2,target:'_blank',rel:'noopener','aria-label':'WhatsApp – '+t.telefon2});
     wa2.appendChild(icon('wa'));wa2.appendChild(document.createTextNode('WhatsApp'));
     acts.appendChild(wa2);
   }
@@ -8255,10 +8429,10 @@ function clientDetail(main,id){
     pbd.appendChild(track);
     pcard.appendChild(pbd);
     if(ap.yenile){
-      const rn=h('button.btn.soft.sm.act',{onclick:()=>Forms.sellPackage(id,ap.paketId)},'Yenile');
+      const rn=h('button.btn.soft.sm.act',{onclick:()=>Forms.sellPackage(id,ap.paketId),'aria-label':'Paketi yenile – '+t.ad},'Yenile');
       pcard.appendChild(rn);
     }
-    if(ap.iptalEdilebilir)pcard.appendChild(h('button.btn.ghost.sm.act',{onclick:()=>Forms.paketIptal(ap.saleId)},'İptal et'));
+    if(ap.iptalEdilebilir)pcard.appendChild(h('button.btn.ghost.sm.act',{onclick:()=>Forms.paketIptal(ap.saleId),'aria-label':'Paketi iptal et – '+t.ad},'İptal et'));
     main.appendChild(pcard);
   }
 
@@ -8319,12 +8493,15 @@ function clientDetail(main,id){
 /* Hatırlatmalar — uzun süredir gelmeyenler (hesap HatirlatmaVM'de; burada çizim ve olay bağlama) */
 UI.register('hatir',main=>{
   const top=h('div.topbar');
+  const back=h('button.btn.ghost.icon.mobil-geri',{onclick:()=>UI.geri('clients'),'aria-label':'Geri'});back.appendChild(icon('left')); /* A10: telefonda geri düğmesi (danışan detayıyla aynı kalıp) */
+  top.appendChild(back);
   const h1=h('h1');h1.textContent='Hatırlatmalar';top.appendChild(h1);
   main.appendChild(top);
   const ilk=HatirlatmaVM.liste();
   const bar=h('div.flex.mb',{style:'flex-wrap:wrap;align-items:center'});
   bar.appendChild(h('span.small.muted',{},'En az şu kadardır gelmeyenler:'));
-  bar.appendChild(UI.seg(ilk.esikSecenekleri,ilk.esik,v=>{HatirlatmaVM.esikSec(v);ciz()}));
+  const es=UI.seg(ilk.esikSecenekleri,ilk.esik,v=>{HatirlatmaVM.esikSec(v);ciz()},'Gelmeme süresi');
+  bar.appendChild(es);
   main.appendChild(bar);
   const kart=h('div.card');main.appendChild(kart);
   function ciz(){
@@ -8333,15 +8510,17 @@ UI.register('hatir',main=>{
     if(l.bos){const e=h('div.empty');e.appendChild(icon('heart'));e.appendChild(h('div',{},'Bu süreyi aşan danışan yok'));kart.appendChild(e);return}
     if(l.satirlar.length){const hint=h('div.small.muted.mb');hint.textContent=l.sayac+' · yeni kopanlar önce';kart.appendChild(hint)}
     const satir=s=>{
-      const row=UI.tiklanir(h('div.row.click.hat-satir'),()=>UI.go('clients',s.id));
+      const b=h('b');b.textContent=s.ad;
+      const row=UI.tiklanir(h('div.row.click.hat-satir'),()=>UI.go('clients',s.id),{ad:b}); /* içinde düğmeler var: satır role=button değil, ad gerçek düğme (A9) */
       const av=h('div.av');av.style.background=s.renk;av.textContent=s.bas;
-      const bd=h('div.body');const b=h('b');b.textContent=s.ad;bd.appendChild(b);
+      const bd=h('div.body');bd.appendChild(b);
       const sm=h('small');sm.textContent=s.aciklama;bd.appendChild(sm);
       const end=h('div.end',{style:'display:flex;gap:6px;align-items:center'});
       if(s.araVerdi){const ch=h('span.chip.gray');ch.textContent='Ara verdi';end.appendChild(ch)}
       if(s.waHref){const wa=h('button.btn.soft.sm',{onclick:e=>{e.stopPropagation();Forms.paketOner(s.id,'yalniz')},'aria-label':'WhatsApp mesajı – '+s.ad});
         wa.appendChild(icon('wa'));end.appendChild(wa)}
-      if(!s.ulasildi)end.appendChild(h('button.btn.ghost.sm',{onclick:e=>{e.stopPropagation();
+      else end.appendChild(h('button.btn.soft.sm',{onclick:e=>{e.stopPropagation();Forms.paketOner(s.id,'yalniz')},'aria-label':'Mesaj hazırla – '+s.ad},'Mesaj')); /* A10: telefonsuz danışana da mesaj (kopyalanır) */
+      if(!s.ulasildi)end.appendChild(h('button.btn.ghost.sm',{'aria-label':'Ulaşıldı olarak işaretle – '+s.ad,onclick:e=>{e.stopPropagation();
         const r=Islem.ulasildiIsaretle(s.id);UI.toast(r.mesaj,r.ok?'ok':'err');ciz()}},'Ulaşıldı'));
       else{const uc=h('span.chip.good');uc.textContent=s.ulasildi;end.appendChild(uc)}
       row.appendChild(av);row.appendChild(bd);row.appendChild(end);kart.appendChild(row);
@@ -8361,7 +8540,8 @@ function openMuhasebe(mk){
   const m=FinansVM.muhasebe(mk);
 
   const bar=h('div.no-print',{style:'display:flex;gap:10px;justify-content:flex-end;margin-bottom:18px'});
-  bar.appendChild(h('button.btn.ghost',{onclick:()=>{sheet.classList.remove('open')}},'Kapat'));
+  let kapat=()=>{};
+  bar.appendChild(h('button.btn.ghost',{onclick:()=>kapat()},'Kapat'));
   bar.appendChild(h('button.btn',{onclick:()=>window.print()},'Yazdır / PDF kaydet'));
   sheet.appendChild(bar);
 
@@ -8397,7 +8577,7 @@ function openMuhasebe(mk){
   const meta=h('div',{style:'margin-top:18px;font-size:11.5px;color:#555;line-height:1.6'});
   meta.textContent=m.not;
   sheet.appendChild(meta);
-  sheet.classList.add('open');
+  kapat=UI.sayfaAc(sheet,'Muhasebe özeti'); /* A14: Esc ve geri tuşu kapatır, odak içeride */
 }
 /* E4: «Para nereye gitti?» — «Her 100 ₺» listesi/paneli. Masaüstünde koyu panel (ilk 3 kategori görünür), telefonda açılır liste.
    Grup satırı düğme: dokununca TÜM kategoriler açılır (aria-expanded). Hesap FinansVM.akis'te. */
@@ -8446,7 +8626,7 @@ function akisKarti(a){
   const goz=h('div.akis-goz');goz.textContent='01 · PARA HARİTASI · '+akisBuyuk(a.donemEtiketi);
   const bs=h('h3.akis-baslik');bs.textContent='Para nereye gitti?';
   bas.appendChild(goz);bas.appendChild(bs);
-  const seg=UI.seg(a.donemler,a.donem,v=>{FinansVM.akisDonemSec(v);UI.render()});
+  const seg=UI.seg(a.donemler,a.donem,v=>{FinansVM.akisDonemSec(v);UI.render()},'Dönem');
   seg.setAttribute('role','group');seg.setAttribute('aria-label','Dönem');
   ust.appendChild(bas);ust.appendChild(seg);kart.appendChild(ust);
   if(a.bos){const e=h('div.empty');e.textContent=a.bosMetni;kart.appendChild(e);return kart}
@@ -8486,7 +8666,7 @@ UI.register('fin',main=>{
   const title=h('h2');title.textContent=fd.ayEtiket;
   head.appendChild(prevB);head.appendChild(nextB);head.appendChild(title);
   head.appendChild(h('div.grow'));
-  head.appendChild(UI.seg(fd.sekmeler,fd.sekme,v=>{FinansVM.sekmeSec(v);UI.render()}));
+  head.appendChild(UI.seg(fd.sekmeler,fd.sekme,v=>{FinansVM.sekmeSec(v);UI.render()},'Finans bölümü'));
   main.appendChild(head);
 
   const mk=fd.ay;
@@ -8585,14 +8765,15 @@ UI.register('fin',main=>{
     dh.appendChild(ab);defs.appendChild(dh);
     if(pk.tanimBos){const e=h('div.empty');e.textContent=pk.tanimBosMetin;defs.appendChild(e)}
     pk.tanimlar.forEach(p=>{
-      const row=UI.tiklanir(h('div.row.click'),()=>Forms.packageTemplate(p.kayit));
+      const bb=h('b');bb.textContent=p.ad;
+      const row=UI.tiklanir(h('div.row.click'),()=>Forms.packageTemplate(p.kayit),{ad:bb}); /* içinde «Paket sat» düğmesi var: satır role=button değil (A9) */
       const av=h('div.av',{style:'border-radius:12px;background:var(--p-sand);color:var(--p-sand-ink)'});av.appendChild(icon('gift'));
-      const bd=h('div.body');const bb=h('b');bb.textContent=p.ad;bd.appendChild(bb);
+      const bd=h('div.body');bd.appendChild(bb);
       const ss=h('small');
       ss.textContent=p.alt;
       bd.appendChild(ss);
       const end=h('div.end');const eb=h('b.money');eb.textContent=p.tutar;end.appendChild(eb);
-      const sat=h('button.btn.sm',{onclick:e=>{e.stopPropagation();Forms.sellPackage(null,p.id)},style:'margin-left:8px'},FormVM.ADLAR.paketSat);
+      const sat=h('button.btn.sm',{onclick:e=>{e.stopPropagation();Forms.sellPackage(null,p.id)},'aria-label':FormVM.ADLAR.paketSat+' – '+p.ad,style:'margin-left:8px'},FormVM.ADLAR.paketSat);
       row.appendChild(av);row.appendChild(bd);row.appendChild(end);row.appendChild(sat);
       defs.appendChild(row);
     });
@@ -8631,14 +8812,15 @@ UI.register('fin',main=>{
     hh.appendChild(ab);card.appendChild(hh);
     if(tk.bos){const e=h('div.empty');e.textContent=tk.bosMetin;card.appendChild(e)}
     tk.satirlar.forEach(r=>{
-      const row=UI.tiklanir(h('div.row.click'),()=>Forms.recurring(r.kayit));
-      const bd=h('div.body');const bb=h('b');bb.textContent=r.ad;bd.appendChild(bb);
+      const bb=h('b');bb.textContent=r.ad;
+      const row=UI.tiklanir(h('div.row.click'),()=>Forms.recurring(r.kayit),r.odendi?undefined:{ad:bb}); /* «Öde ✓» düğmesi varsa satır role=button değil (A9) */
+      const bd=h('div.body');bd.appendChild(bb);
       const ss=h('small');ss.textContent=r.alt;bd.appendChild(ss);
       const end=h('div.end');const eb=h('b.money');eb.textContent=r.tutar;end.appendChild(eb);
       const es=h('small');es.textContent=r.durumMetin;end.appendChild(es);
       row.appendChild(bd);row.appendChild(end);
       if(!r.odendi){
-        const pb=h('button.btn.soft.sm',{onclick:e=>{e.stopPropagation();
+        const pb=h('button.btn.soft.sm',{'aria-label':'Öde – '+r.ad,onclick:e=>{e.stopPropagation();
           const o=Islem.tekrarlayanOde(r.id,todayStr());
           UI.toast(o.ok?o.mesaj:o.hata,o.ok?'ok':'err');UI.render();
         }},'Öde ✓');
@@ -8664,8 +8846,9 @@ UI.register('rep',main=>{
   /* geri kazanım (Sena 10-29): hatırlatma + paket önerilerinin getirisi */
   const gk=RaporVM.geriKazanim();
   const gkc=h('div.card.mb');
-  const gkh=h('h3');gkh.appendChild(icon('heart'));gkh.appendChild(document.createTextNode(' Geri kazanım — hatırlatma ve paket önerilerinin getirisi'));
+  const gkh=h('h3');gkh.appendChild(icon('heart'));gkh.appendChild(document.createTextNode(' Geri kazanım'));
   const gkhint=h('span.hint');gkhint.textContent='son 12 ay';gkh.appendChild(gkhint);gkc.appendChild(gkh);
+  gkc.appendChild(h('div.help.mb',{},'Hatırlatma ve paket önerilerinin getirisi')); /* A20: başlık kısa, açıklama altta */
   if(gk.bos){const e=h('div.empty');e.textContent=gk.bosMetni;gkc.appendChild(e)}
   else{
     const st=h('div.grid.cols-4');
@@ -8795,18 +8978,18 @@ async function davetAc(dg,ev){
 function davetPenceresi(p,qr){
   return UI.modal(p.baslik,(m,close)=>{
     if(p.yerelUyari)m.appendChild(h('p.small.neg',{style:'margin-bottom:10px'},p.yerelUyari));
-    if(qr)m.appendChild(h('div.davet-qr',{html:qr.svg}));
+    if(qr)m.appendChild(h('div.davet-qr',{html:qr.svg,role:'img','aria-label':p.qrEtiket}));
     else m.appendChild(h('p.small.neg',{style:'margin-bottom:10px'},p.qrYok));
     const adim=h('ol.davet-adimlar');
     p.adimlar.forEach(t=>adim.appendChild(h('li',{},t)));
     m.appendChild(adim);
     m.appendChild(h('div.davet-kod-etiket',{},p.kodEtiket));
-    const kutu=h('div.davet-kod',{'aria-label':p.kodEtiket+': '+p.kod});
+    const kutu=h('div.davet-kod',{role:'group','aria-label':p.kodEtiket+': '+p.kod});
     p.gruplar.forEach(g=>kutu.appendChild(h('span.davet-kod-grup',{},g)));
     m.appendChild(kutu);
     m.appendChild(h('p.small.davet-gecerlilik',{},p.gecerlilik));
     m.appendChild(h('p.small.davet-kod-notu',{},p.kodNotu));
-    const metinKutusu=h('textarea',{readonly:true,rows:4,style:'display:none;width:100%;font-size:11px;margin-bottom:10px'});
+    const metinKutusu=h('textarea',{readonly:true,rows:4,style:'display:none;width:100%;font-size:16px;margin-bottom:10px'});
     metinKutusu.value=p.url;
     m.appendChild(metinKutusu);
     m.appendChild(h('button.btn.soft',{type:'button',onclick:async()=>{
@@ -8839,7 +9022,7 @@ UI.register('set',(main,acilacak)=>{
   const pkT=UI.taslakBagla(h('textarea'));pkT.value=gf.paketOneriSablonu;
   const pkH=UI.taslakBagla(h('textarea'));pkH.value=gf.paketHatirlatSablonu;
   const hatT=UI.taslakBagla(h('textarea'));hatT.value=gf.hatirlatSablonu;
-  const weeks=UI.taslakBagla(UI.input({value:gf.inactiveWeeks,type:'number',min:1,max:12}));
+  const weeks=UI.taslakBagla(UI.input({value:gf.inactiveWeeks,type:'number',min:1,max:52}));
   const debtW=UI.taslakBagla(UI.input({value:gf.debtWarn,type:'number'}));
   const waT=UI.taslakBagla(h('textarea'));waT.value=gf.waTemplate;
   gi.appendChild(UI.field('Klinik / marka adı',clinic));
@@ -8856,11 +9039,16 @@ UI.register('set',(main,acilacak)=>{
   gi.appendChild(UI.field('Yalnız hatırlatma mesajı — uzun süredir gelmeyenlere',hatT,'{ad} {klinik} alanları otomatik doldurulur'));
   gi.appendChild(UI.field('Paket önerisi mesajı — seyrek gelenlere',pkT,'{ad} {seans} {fiyat} {seansbasi} {normal} {klinik} alanları otomatik doldurulur'));
   gi.appendChild(UI.field('Hatırlatma + paket mesajı — bir kez gelip dönmeyenlere / uzaklaşanlara',pkH,'aynı alanlar kullanılır'));
+  gi.appendChild(h('div.form-hata.hide',{role:'alert',id:'ayar-genel-hata'}));
   gi.appendChild(h('button.btn',{onclick:()=>{
-    UI.taslakDusur(); /* Islem'in emit'i ekranı normal çizsin */
-    const r=Islem.ayarlarKaydet({clinicName:clinic.value,assistantName:asst.value,defaultFee:fee.value,
+    const g={clinicName:clinic.value,assistantName:asst.value,defaultFee:fee.value,
       coupleFee:ciftFee.value,paketOneriSablonu:pkT.value,paketHatirlatSablonu:pkH.value,hatirlatSablonu:hatT.value,
-      inactiveWeeks:weeks.value,debtWarn:debtW.value,waTemplate:waT.value});
+      inactiveWeeks:weeks.value,debtWarn:debtW.value,waTemplate:waT.value};
+    /* B3: geçersiz değerde kaydetme, taslağı düşürme, ekranı yeniden çizme — hata alanda */
+    const hata=Islem.ayarlarDogrula(g);
+    if(hata){gi.querySelector('.form-hata').classList.remove('hide');return UI.formHatasi(gi,hata,{defaultFee:fee,coupleFee:ciftFee,inactiveWeeks:weeks,debtWarn:debtW})}
+    UI.taslakDusur(); /* Islem'in emit'i ekranı normal çizsin */
+    const r=Islem.ayarlarKaydet(g);
     UI.shell();UI.toast(r.mesaj,'ok');
   }},'Kaydet'));
   gen.appendChild(gi);main.appendChild(gen);
@@ -8871,7 +9059,7 @@ UI.register('set',(main,acilacak)=>{
   const gosum=h('summary');gosum.appendChild(icon('sun'));gosum.appendChild(document.createTextNode('Görünüm'));gdet.appendChild(gosum);
   const goi=h('div.inner');
   const gseg=UI.seg(gor.secenekler,gor.secili,v=>{Tema.sec(v);UI.toast(gor.bildirim,'ok')});
-  goi.appendChild(UI.field('Görünüm',gseg,gor.yardim));
+  goi.appendChild(UI.field(gor.etiket,gseg,gor.yardim));
   gdet.appendChild(goi);main.appendChild(gdet);
 
   /* --- kategoriler --- */
@@ -8902,9 +9090,9 @@ UI.register('set',(main,acilacak)=>{
   const gii=h('div.inner');
   const info=h('p',{style:'font-size:12.5px;color:var(--ink-2);margin-bottom:12px'},AyarVM.githubBilgi());
   gii.appendChild(info);
-  const owner=UI.taslakBagla(UI.input({value:gf2.owner,placeholder:'github kullanıcı adı'}));
-  const repo=UI.taslakBagla(UI.input({value:gf2.repo,placeholder:'örn. sena-veri'}));
-  const token=UI.taslakBagla(UI.input({value:gf2.token,placeholder:'github_pat_…',type:'password'}));
+  const owner=UI.taslakBagla(UI.input({value:gf2.owner,placeholder:'github kullanıcı adı',autocomplete:'off'}));
+  const repo=UI.taslakBagla(UI.input({value:gf2.repo,placeholder:'örn. sena-veri',autocomplete:'off'}));
+  const token=UI.taslakBagla(UI.input({value:gf2.token,placeholder:'github_pat_…',type:'password',autocomplete:'off'}));
   const tokenBitis=UI.taslakBagla(UI.input({value:gf2.tokenBitis,type:'date'}));
   const frg=h('div.frow');frg.appendChild(UI.field('Kullanıcı',owner));frg.appendChild(UI.field('Repo',repo));
   gii.appendChild(frg);
@@ -8984,7 +9172,7 @@ UI.register('set',(main,acilacak)=>{
         const y=await Islem.yedekGeriYukle(r.veri);
         if(!y.ok)return UI.toast(y.hata,'err');
         UI.toast(y.mesaj,'ok');UI.render();
-      });
+      },{tehlikeli:true}); /* bütün kayıtları değiştirir — dört göz 2. tur A22 */
     }});
   bi.appendChild(dosyaSec);
   const geriRow=h('div.flex',{style:'flex-wrap:wrap;gap:8px;margin-top:8px'});
@@ -9013,10 +9201,19 @@ UI.register('set',(main,acilacak)=>{
   si.appendChild(h('p',{style:'font-size:12.5px;color:var(--ink-2);margin-bottom:10px'},pb.aciklama));
   const np=UI.taslakBagla(UI.input({type:'password',placeholder:pb.yer,autocomplete:'new-password'}));
   si.appendChild(UI.field(pb.alan,np));
+  /* B1: kilit ekranındaki yeni-parola düzeniyle aynı — tekrar kutusu, göster/gizle, ≥8 + eşleşme kuralı (Islem.parolaKontrol), hata pencere içinde */
+  const np2=UI.taslakBagla(UI.input({type:'password',placeholder:pb.tekrarYer,autocomplete:'new-password'}));
+  si.appendChild(UI.field(pb.tekrar,np2));
+  si.appendChild(Forms.parolaGoster([np,np2]));
+  si.appendChild(h('div.form-hata.hide',{role:'alert',id:'ayar-parola-hata'}));
   si.appendChild(h('button.btn',{onclick:async()=>{
+    const hata=ev=>{si.querySelector('.form-hata').classList.remove('hide');return UI.formHatasi(si,ev,{yeni:np,tekrar:np2})};
+    const k=Islem.parolaKontrol(np.value,np2.value,true);
+    if(!k.ok)return hata({ok:false,hata:k.hata,alan:np.value.length<8?'yeni':'tekrar'});
     const r=await Islem.parolaDegistir(np.value);
-    if(!r.ok)return UI.toast(r.hata,'err');
-    np.value='';UI.taslakBitti(np);UI.toast(r.mesaj,'ok');
+    if(!r.ok)return hata({ok:false,hata:r.hata,alan:'yeni'});
+    si.querySelector('.form-hata').classList.add('hide');
+    np.value=np2.value='';UI.taslakBitti(np);UI.taslakBitti(np2);UI.toast(r.mesaj,'ok');
   }},pb.dugme));
   /* yeni kurtarma kodu (yalnız Sena; karar AyarVM.yeniKurtarma) */
   const kt=AyarVM.yeniKurtarma();
@@ -9118,14 +9315,7 @@ const App={
     if(yeniVeri){
       pass2=UI.input({type:'password',placeholder:'Parolayı tekrar yazın',autocomplete:'new-password'});
       card.appendChild(UI.field('Parolayı tekrar yazın',pass2));
-      const goster=h('button.btn.ghost.sm.gate-goster',{type:'button','aria-pressed':'false',style:'margin:0 0 12px'},'Parolayı göster');
-      goster.addEventListener('click',()=>{
-        const aciyor=goster.getAttribute('aria-pressed')!=='true';
-        goster.setAttribute('aria-pressed',aciyor?'true':'false');
-        goster.textContent=aciyor?'Parolayı gizle':'Parolayı göster';
-        pass.type=pass2.type=aciyor?'text':'password';
-      });
-      card.appendChild(goster);
+      card.appendChild(Forms.parolaGoster([pass,pass2]));
       card.appendChild(h('div.gate-note',{style:'margin:0 0 12px;color:var(--ink-2);font-weight:600'},
         KilitVM.M.normal.yeniVeriNotu)); /* masa 10-14: eski «unutursanız açılamaz» notu kurtarma kodu varken yanıltıcıydı */
     }
@@ -9136,9 +9326,9 @@ const App={
     const advNot=h('div.gate-note',{style:'margin:0 0 10px;text-align:left'});
     adv.appendChild(advSum);adv.appendChild(advNot);
     let elleAcik=false;
-    const owner=UI.input({placeholder:'GitHub kullanıcı adı'});
-    const repo=UI.input({placeholder:'Veri repo adı (örn. sena-veri)'});
-    const token=UI.input({placeholder:'Erişim anahtarı (github_pat_…)',type:'password'});
+    const owner=UI.input({placeholder:'GitHub kullanıcı adı',autocomplete:'off'});
+    const repo=UI.input({placeholder:'Veri repo adı (örn. sena-veri)',autocomplete:'off'});
+    const token=UI.input({placeholder:'Erişim anahtarı (github_pat_…)',type:'password',autocomplete:'off'});
     [['GitHub kullanıcı',owner],['Repo',repo],['Anahtar',token]].forEach(([l,i2])=>adv.appendChild(UI.field(l,i2)));
     card.appendChild(adv);
 
@@ -9262,14 +9452,7 @@ const App={
       card.appendChild(f);
     });
     if(d.goster){
-      const goster=h('button.btn.ghost.sm.gate-goster',{type:'button','aria-pressed':'false',style:'margin:0 0 12px'},'Parolayı göster');
-      goster.addEventListener('click',()=>{
-        const aciyor=goster.getAttribute('aria-pressed')!=='true';
-        goster.setAttribute('aria-pressed',aciyor?'true':'false');
-        goster.textContent=aciyor?'Parolayı gizle':'Parolayı göster';
-        d.alanlar.forEach(a=>{if(a.tur==='password')girdi[a.ad].type=aciyor?'text':'password'});
-      });
-      card.appendChild(goster);
+      card.appendChild(Forms.parolaGoster(d.alanlar.filter(a=>a.tur==='password').map(a=>girdi[a.ad])));
     }
     if(d.not)card.appendChild(h('div.gate-note',{style:'margin:0 0 12px;color:var(--ink-2);font-weight:600'},d.not));
     let dugme=null;
@@ -9327,7 +9510,10 @@ const App={
     const kopya=h('button.btn.ghost.gate-kopyala',{type:'button',style:'width:100%;margin-bottom:8px'},k.kopyala);
     kopya.addEventListener('click',async()=>{
       try{await navigator.clipboard.writeText(k.kod);kopya.textContent=k.kopyalandi}
-      catch(e){ /* pano izni yok: metin zaten seçilebilir (user-select:all) */ }
+      catch(e){ /* pano izni yok: kod seçilir (user-select:all) ve kullanıcı bilgilendirilir — sessiz kalmaz (B10) */
+        try{const r=document.createRange();r.selectNodeContents(kutu);const sel=window.getSelection();sel.removeAllRanges();sel.addRange(r)}catch(e2){}
+        UI.toast(k.kopyalanamadi,'err');
+      }
     });
     card.appendChild(kopya);
     const tamam=h('button.btn.gate-ana',{type:'button',style:'width:100%;padding:12px'},k.dugme);
