@@ -3595,7 +3595,7 @@ const Store={
      paket = satılan paket bedelleri − paketten düşülen «geldi» seans ücretleri; fazla = avans − paket (≥0) */
   avansDokumu(clientId){
     const kalan=this.balance(clientId).kalan;
-    const satis=this.col('packageSales').filter(s=>s.clientId===clientId);
+    const satis=this.col('packageSales').filter(s=>s.clientId===clientId&&!s.iptal); // iptalde peşin kalan iade/kesintiyle kapandı
     let paket=0,seans=0;
     for(const s of satis){paket+=Number(s.price)||0;seans+=this.saleUsage(s).remaining}
     for(const a of this.col('appointments'))
@@ -3635,7 +3635,13 @@ const Store={
   /* ---- seans paketleri ---- */
   saleUsage(s){
     const used=this.col('appointments').filter(a=>a.packageSaleId===s.id&&a.status==='geldi').length;
-    return {used,remaining:Math.max(0,(Number(s.sessions)||0)-used)};
+    return {used,remaining:s.iptal?0:Math.max(0,(Number(s.sessions)||0)-used)}; // iptal edilen paketten seans düşmez (Ketty 10-29)
+  },
+  /* paketin peşin ödenip henüz kullanılmayan tutarı: bedel − paketten düşülen «geldi» seans ücretleri (≥0) */
+  paketKullanilmayan(s){
+    let k=Number(s.price)||0;
+    for(const a of this.col('appointments'))if(a.packageSaleId===s.id&&a.status==='geldi')k-=Number(a.fee)||0;
+    return Math.max(0,k);
   },
   /* tur verilirse yalnız o türdeki paket (çift seansı çift paketinden, bireysel seans bireysel paketten düşer) */
   activeSale(clientId,tur){
@@ -4468,6 +4474,29 @@ const Islem={
         method:g.method,note:'Paket satışı: '+sale.name,packageSaleId:sale.id});
     });
     return {ok:true,mesaj:'Paket satıldı — '+money(sale.price)+' gelir olarak işlendi',kayit:sale,odeme};
+  },
+
+  /* ---------- paket iptali (Ketty 10-29: «belki vazgeçen olur») ----------
+     Kullanılmayan kısım = paket bedeli − paketten düşülen «geldi» seans ücretleri. g: {iade,tarih,method}; iade 0..kullanılmayan.
+     iade>0 → eksi ödeme (iadeKaydet gibi: bakiye ve o ayın geliri düşer); iade edilmeyen kısım → kesinti düzeltmesi.
+     Sonuçta paketin peşin kalanı sıfırlanır: danışanın bakiyesi pakette ne idiyse ona döner. Paket bir daha seans düşmez. */
+  paketIptal(saleId,g){
+    const s=Store.find('packageSales',saleId);
+    if(!s)return {ok:false,hata:'Paket bulunamadı'};
+    if(s.iptal)return {ok:false,hata:'Bu paket zaten iptal edildi'};
+    if(!Store.saleUsage(s).remaining)return {ok:false,hata:'Paketin bütün seansları kullanıldı'};
+    const kullanilmayan=Store.paketKullanilmayan(s);
+    const iade=g.iade===''||g.iade==null?0:Number(g.iade);
+    if(!(iade>=0)||iade>kullanilmayan)return {ok:false,hata:'İade 0 ile '+money(kullanilmayan)+' arasında olmalı',alan:'iade'};
+    const kesinti=kullanilmayan-iade;
+    Store.toplu(()=>{
+      Store.update('packageSales',s.id,{iptal:{tarih:g.tarih,kim:Store.user,iade}});
+      if(iade>0)Store.add('payments',{clientId:s.clientId,amount:-iade,iade:true,date:g.tarih,method:g.method,
+        note:'Paket iptali iadesi: '+s.name,packageSaleId:s.id});
+      if(kesinti>0)Store.add('adjustments',{clientId:s.clientId,amount:kesinti,date:g.tarih,
+        note:'Paket iptali — iade edilmeyen: '+s.name,packageSaleId:s.id});
+    });
+    return {ok:true,mesaj:'Paket iptal edildi'+(iade>0?' — '+money(iade)+' iade':'')};
   },
 
   /* ---------- bekleme listesi (V-F18, V-F19) — başarıda toast YOK ---------- */
@@ -5394,12 +5423,17 @@ const DanisanVM={
     const mySales=Store.col('packageSales').filter(s=>s.clientId===id).sort((a,b)=>a.date<b.date?1:-1);
     if(mySales.length){
       const last=mySales[0];const u=Store.saleUsage(last);
-      aktifPaket={
+      if(last.iptal)aktifPaket={
+        sinif:'warn',baslik:ciftEki(last)+last.name+' — iptal edildi',
+        alt:u.used+'/'+last.sessions+' kullanıldı · '+fmtD(last.iptal.tarih)+' tarihinde iptal'+(last.iptal.iade>0?' · '+money(last.iptal.iade)+' iade':''),
+        yuzde:Math.round(u.used/last.sessions*100)+'%',yenile:false,paketId:last.packageId,iptalEdilebilir:false,saleId:last.id
+      };
+      else aktifPaket={
         sinif:u.remaining===0?'warn':'good',
         baslik:ciftEki(last)+last.name+(u.remaining===0?' — tamamlandı':' — '+u.remaining+' seans kaldı'),
         alt:u.used+'/'+last.sessions+' kullanıldı · '+fmtD(last.date)+' tarihinde '+money(last.price)+' ile alındı',
         yuzde:Math.round(u.used/last.sessions*100)+'%',
-        yenile:u.remaining===0,paketId:last.packageId
+        yenile:u.remaining===0,paketId:last.packageId,iptalEdilebilir:u.remaining>0,saleId:last.id
       };
     }
 
@@ -5751,8 +5785,8 @@ const FinansVM={
         danisan:ad,bas:initials(ad),renk:avColor(ad),
         alt:ciftEki(s)+s.name+' · '+fmtD(s.date)+' · '+money(s.price),
         yuzde:Math.round(u.used/s.sessions*100)+'%',
-        cipSinif:u.remaining===0?'gray':u.remaining===1?'sand':'sage',
-        cipMetin:u.remaining===0?'Tamamlandı':u.used+'/'+s.sessions+' · '+u.remaining+' kaldı'
+        cipSinif:s.iptal||u.remaining===0?'gray':u.remaining===1?'sand':'sage',
+        cipMetin:s.iptal?'İptal edildi':u.remaining===0?'Tamamlandı':u.used+'/'+s.sessions+' · '+u.remaining+' kaldı'
       };
     });
     return {
@@ -6415,6 +6449,18 @@ const FormVM={
 
   /* para iadesi (Sena 10-27): tahsilat formunda «Para iadesi» seçiliyken bakiye satırı + önerilen tutar.
      Avans (kalan<0) varsa tutar = avans; yoksa tutar null ve uyarı (iade bakiyeyi borca çevirir). */
+  /* paket iptali penceresi (Ketty 10-29): kullanım + önerilen iade (= kullanılmayan kısım, değiştirilebilir). Paket yok/iptal → null */
+  paketIptalOzeti(saleId){
+    const s=Store.find('packageSales',saleId);
+    if(!s||s.iptal)return null;
+    const u=Store.saleUsage(s);const k=Store.paketKullanilmayan(s);
+    return {
+      baslik:ciftEki(s)+s.name,
+      metin:u.used+'/'+s.sessions+' seans kullanıldı · kullanılmayan kısım '+money(k),
+      iade:String(k),
+      not:'İade etmediğiniz kısım danışanın hesabında kesinti olarak kalır. İptal edilen paketten bir daha seans düşmez.'
+    };
+  },
   iadeBakiyesi(clientId){
     if(!clientId)return {metin:'',tutar:null};
     const b=Store.balance(clientId);
@@ -7493,6 +7539,29 @@ const Forms={
     });
   },
 
+  /* paket iptali (Ketty 10-29): önerilen iade = kullanılmayan kısım; değiştirilebilir, 0 = iade yok */
+  paketIptal(saleId){
+    const o=FormVM.paketIptalOzeti(saleId);
+    if(!o)return;
+    UI.modal('Paketi iptal et',(m,close)=>{
+      const bilgi=h('div.alert.warn',{style:'margin-bottom:12px'});
+      const bd=h('div');const b=h('b');b.textContent=o.baslik;bd.appendChild(b);
+      const sm=h('small');sm.textContent=o.metin;bd.appendChild(sm);bilgi.appendChild(bd);m.appendChild(bilgi);
+      const iade=UI.input({value:o.iade,type:'number',inputmode:'numeric'});
+      const method=UI.seg([['nakit','Nakit'],['havale','Havale/EFT'],['kart','Kart']],'nakit');
+      m.appendChild(UI.field('İade edilecek tutar (₺)',iade,o.not));
+      m.appendChild(UI.field('İade yöntemi',method));
+      const acts=h('div.actions');
+      acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
+      acts.appendChild(h('button.btn.danger',{onclick:()=>{
+        const r=Islem.paketIptal(saleId,{iade:iade.value,tarih:todayStr(),method:method.dataset.value});
+        if(!r.ok)return UI.formHatasi(m,r,{iade});
+        close();UI.toast(r.mesaj,'ok');UI.render();
+      }},'Paketi iptal et'));
+      m.appendChild(acts);
+    });
+  },
+
   /* manuel borç / indirim — K3.3: tür seçici + POZİTİF tutar (iPhone sayısal klavyede eksi yok); işareti FormVM.duzeltmeTutari verir */
   adjustment(clientId){
     UI.modal(FormVM.ADLAR.duzeltme,(m,close)=>{
@@ -8140,6 +8209,7 @@ function clientDetail(main,id){
       const rn=h('button.btn.soft.sm.act',{onclick:()=>Forms.sellPackage(id,ap.paketId)},'Yenile');
       pcard.appendChild(rn);
     }
+    if(ap.iptalEdilebilir)pcard.appendChild(h('button.btn.ghost.sm.act',{onclick:()=>Forms.paketIptal(ap.saleId)},'İptal et'));
     main.appendChild(pcard);
   }
 
