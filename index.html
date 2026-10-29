@@ -2988,6 +2988,7 @@ const turUcreti=tur=>{const S=Store.data.settings;
 /* randevu ücret kutusu boşsa: danışanın kendi türündeyse danışanın ücreti, başka türde ise o türün standart ücreti */
 const varsayilanUcret=(c,tur)=>{tur=tur||'bireysel';
   return c&&(c.tur||'bireysel')===tur&&c.fee?Number(c.fee):turUcreti(tur)};
+const PAKET_HATIRLAT_SABLONU='Merhaba {ad}, nasılsınız? Umarım her şey yolundadır. Bir süredir görüşemedik; dilerseniz kaldığımız yerden devam edebiliriz. Bu dönem size özel bir paketimiz de var: {seans} seans toplam {fiyat} (seans başı {seansbasi}; normalde {normal}). Uygun olduğunuzda haber vermeniz yeterli. 🌿 {klinik}';
 const PAKET_ONERI_SABLONU='Merhaba {ad}, seanslarımıza daha düzenli devam edebilmeniz için size özel bir paket hazırladık: {seans} seans toplam {fiyat} (seans başı {seansbasi}; normalde {normal}). Dilerseniz bir sonraki görüşmemizde birlikte planlayalım. 🌿 {klinik}';
 const num=n=>(Number(n)||0).toLocaleString('tr-TR');
 
@@ -3360,7 +3361,7 @@ function blankData(){
     schema:1, updatedAt:nowIso(), settingsUpdatedAt:'', // boş yeni veri gerçek ayarı asla ezmesin
     settings:{
       clinicName:'Sena Psikoloji', assistantName:'Ketty',
-      defaultFee:1500, coupleFee:4500, inactiveWeeks:3, debtWarn:3000, paketOneriSablonu:PAKET_ONERI_SABLONU,
+      defaultFee:1500, coupleFee:4500, inactiveWeeks:3, debtWarn:3000, paketOneriSablonu:PAKET_ONERI_SABLONU, paketHatirlatSablonu:PAKET_HATIRLAT_SABLONU,
       incomeCategories:['Seans','Süpervizyon','Eğitim/Atölye','Rapor','Diğer'],
       expenseCategories:['Kira','Elektrik','Su','İnternet','Aidat','Isınma','Malzeme','Vergi/SGK','Muhasebe','Temizlik','Diğer'],
       personalCategories:['Market','Ulaşım','Sağlık','Giyim','Eğlence','Abonelikler','Ev','Diğer'],
@@ -3661,21 +3662,31 @@ const Store={
     return {sonYedekAt:iso,sonYedekGunu,gunOnce,hatirlat:veriVar&&(gunOnce==null||gunOnce>=this.YEDEK_GUN)};
   },
 
-  PAKET_ONERI_ARA:18,PAKET_ONERI_SUSKU:45,
-  /* null | {seans, ara(gün)} — alerts() 5b'nin ölçütü */
+  PAKET_ONERI_ARA:18,PAKET_ONERI_SUSKU:45,PAKET_HATIRLAT_UST:365,
+  /* null | {tur, hatirlat, seans, ...} — alerts() 5b'nin ölçütü. Üç durum:
+     'tek'    bir kez gelmiş, dönmemiş · 'uzak' birkaç kez gelmiş, artık gelmiyor
+              (ikisi de: ileri randevu yok, son seans ≥ inactiveWeeks hafta ve ≤ 1 yıl önce; aktif ya da ara verdi)
+              → hatirlat:true: mesaj «nasılsınız» hatırlatması + paket önerisi (Sena 10-29: bir taşla iki kuş)
+     'seyrek' aktif, hâlâ geliyor ama seyrek (son 6 ayda ≥2 seans, ortalama ≥ PAKET_ONERI_ARA gün) → yalnız paket önerisi */
   paketOnerisiDurumu(c,t){
     t=t||todayStr();
-    if(c.status!=='aktif')return null;
+    if(c.status!=='aktif'&&c.status!=='pasif')return null;
     if(c.paketOnerisi&&c.paketOnerisi.tarih&&daysBetween(c.paketOnerisi.tarih,t)<this.PAKET_ONERI_SUSKU)return null;
     if(this.activeSale(c.id))return null;
     if(this.col('packageSales').some(x=>x.clientId===c.id&&daysBetween(x.date,t)<=90))return null;
+    const tum=this.col('appointments').filter(a=>a.clientId===c.id&&a.status==='geldi'&&a.date<=t).map(a=>a.date).sort();
+    if(!tum.length)return null;
+    const son=tum[tum.length-1],gecen=daysBetween(son,t);
+    const wk=(this.data.settings.inactiveWeeks||3)*7;
+    if(!this.clientStats(c.id).sonraki&&gecen>=wk&&gecen<=this.PAKET_HATIRLAT_UST)
+      return {tur:tum.length===1?'tek':'uzak',hatirlat:true,seans:tum.length,son,gecen};
+    if(c.status!=='aktif')return null;
     const bas=addDays(t,-180);
-    const g=this.col('appointments').filter(a=>a.clientId===c.id&&a.status==='geldi'&&a.date>=bas&&a.date<=t)
-      .map(a=>a.date).sort();
+    const g=tum.filter(d=>d>=bas);
     if(g.length<2)return null;
     const ara=Math.round(daysBetween(g[0],g[g.length-1])/(g.length-1));
     if(ara<this.PAKET_ONERI_ARA)return null;
-    return {seans:g.length,ara};
+    return {tur:'seyrek',hatirlat:false,seans:g.length,ara};
   },
 
   /* uyarı motoru */
@@ -3739,7 +3750,14 @@ const Store={
        Öneri gönderildiyse (c.paketOnerisi) PAKET_ONERI_SUSKU gün tekrar sorulmaz. */
     for(const c of this.col('clients')){
       const o=this.paketOnerisiDurumu(c,t);
-      if(o)out.push({type:'paketOner',sev:'info',client:c,
+      if(!o)continue;
+      if(o.tur==='tek')out.push({type:'paketOner',sev:'info',client:c,hatirlat:true,
+        title:c.name+' — bir kez gelip dönmedi',
+        sub:'Tek seansı '+fmtD(o.son)+' · '+o.gecen+' gündür yok — hatırlatma mesajına paket önerisi ekleyin'});
+      else if(o.tur==='uzak')out.push({type:'paketOner',sev:'info',client:c,hatirlat:true,
+        title:c.name+' — bir süredir gelmiyor',
+        sub:o.seans+' seans geldi, son seans '+o.gecen+' gün önce — hatırlatma mesajına paket önerisi ekleyin'});
+      else out.push({type:'paketOner',sev:'info',client:c,
         title:c.name+' — paket önerilebilir',
         sub:'Son 6 ayda '+o.seans+' seans, ortalama '+o.ara+' günde bir · paket daha düzenli gelmesini sağlayabilir'});
     }
@@ -4397,8 +4415,11 @@ const Islem={
   /* ---------- paket önerisi (Sena 10-29) ---------- */
   /* WhatsApp'a gönderilince danışana yazılır → öneri kartı PAKET_ONERI_SUSKU gün susar */
   paketOneriGonderildi(clientId,g,bugun){
-    Store.update('clients',clientId,{paketOnerisi:{tarih:bugun||todayStr(),seans:Number(g.sessions)||0,fiyat:Number(g.price)||0,kim:Store.user}});
-    return {ok:true,mesaj:'Paket önerisi WhatsApp\'ta açıldı'};
+    const tarih=bugun||todayStr();
+    const deg={paketOnerisi:{tarih,seans:Number(g.sessions)||0,fiyat:Number(g.price)||0,kim:Store.user}};
+    if(g.hatirlat)deg.ulasildi={tarih,kim:Store.user}; /* hatırlatma da yapıldı → Hatırlatmalar'da «ulaşıldı» */
+    Store.update('clients',clientId,deg);
+    return {ok:true,mesaj:g.hatirlat?'Hatırlatma + paket önerisi WhatsApp\'ta açıldı':'Paket önerisi WhatsApp\'ta açıldı'};
   },
 
   /* ---------- paket satışı (V-F17) ---------- */
@@ -4461,6 +4482,7 @@ const Islem={
   ayarlarKaydet(g){
     Object.assign(Store.data.settings,{clinicName:g.clinicName,assistantName:g.assistantName,defaultFee:Number(g.defaultFee)||0,
       coupleFee:Number(g.coupleFee)||0,paketOneriSablonu:g.paketOneriSablonu||PAKET_ONERI_SABLONU,
+      paketHatirlatSablonu:g.paketHatirlatSablonu||PAKET_HATIRLAT_SABLONU,
       inactiveWeeks:Number(g.inactiveWeeks)||3,debtWarn:Number(g.debtWarn)||3000,waTemplate:g.waTemplate});
     Store.touchSettings();
     return {ok:true,mesaj:'Kaydedildi'};
@@ -5101,7 +5123,12 @@ const DashVM={
   _uyarilar(t,simdi,user){
     const sevOrder={crit:0,serious:1,warn:2,info:3,good:4};
     const kisiselVar=Gizlilik.kisiselGorur(user||Store.user); /* KUL2: kişisel tekrarlayan ödeme hatırlatması da Ketty'ye gitmez */
-    return DashVM._ekUyarilar(t,simdi).concat(Store.alerts().filter(al=>al.type!=='borc'&&(kisiselVar||!(al.rec&&al.rec.type==='kisisel')))).sort((a,b)=>sevOrder[a.sev]-sevOrder[b.sev]);
+    const tum=Store.alerts();
+    /* Sena 10-29: «hatırlatma + paket» kartı olan danışanın ayrı «uzaklaşıyor» kartı gösterilmez (tek mesaj ikisini de yapar) */
+    const pkHat=new Set(tum.filter(al=>al.type==='paketOner'&&al.hatirlat).map(al=>al.client.id));
+    /* hatırlatma + paket mesajı yeni gönderildiyse (PAKET_ONERI_SUSKU gün) «uzaklaşıyor» kartı da susar */
+    tum.forEach(al=>{const po=al.type==='uzak'&&al.client.paketOnerisi;if(po&&po.tarih&&daysBetween(po.tarih,t)<Store.PAKET_ONERI_SUSKU)pkHat.add(al.client.id)});
+    return DashVM._ekUyarilar(t,simdi).concat(tum.filter(al=>al.type!=='borc'&&!(al.type==='uzak'&&pkHat.has(al.client.id))&&(kisiselVar||!(al.rec&&al.rec.type==='kisisel')))).sort((a,b)=>sevOrder[a.sev]-sevOrder[b.sev]);
   },
 
   durum(ctx={}){
@@ -5894,7 +5921,7 @@ const AyarVM={
   genelForm(){
     const s=Store.data.settings;
     return {clinicName:s.clinicName||'',assistantName:s.assistantName||'',defaultFee:s.defaultFee,coupleFee:turUcreti('cift'),
-      paketOneriSablonu:s.paketOneriSablonu||PAKET_ONERI_SABLONU,
+      paketOneriSablonu:s.paketOneriSablonu||PAKET_ONERI_SABLONU,paketHatirlatSablonu:s.paketHatirlatSablonu||PAKET_HATIRLAT_SABLONU,
       inactiveWeeks:s.inactiveWeeks,debtWarn:s.debtWarn,waTemplate:s.waTemplate||''};
   },
 
@@ -6340,12 +6367,13 @@ const FormVM={
     const ilk=tpls[0];
     return {birim,sessions:ilk?ilk.sessions:4,price:ilk?ilk.price:Math.round(birim*4*0.9/100)*100,packageId:ilk?ilk.id:''};
   },
-  paketOneriMetni(clientId,seans,fiyat){
+  paketOneriMetni(clientId,seans,fiyat,hatirlat){
     const c=Store.find('clients',clientId);if(!c)return '';
     const S=Store.data.settings;const n=Number(seans)||0,f=Number(fiyat)||0;
     const birim=varsayilanUcret(c,c.tur);
     const al={ad:c.name.split(' ')[0],seans:String(n),fiyat:money(f),seansbasi:n?money(Math.round(f/n)):'',normal:money(birim*n),klinik:S.clinicName||''};
-    return (S.paketOneriSablonu||PAKET_ONERI_SABLONU).replace(/\{(ad|seans|fiyat|seansbasi|normal|klinik)\}/g,(_,k)=>al[k]);
+    const kalip=hatirlat?(S.paketHatirlatSablonu||PAKET_HATIRLAT_SABLONU):(S.paketOneriSablonu||PAKET_ONERI_SABLONU);
+    return kalip.replace(/\{(ad|seans|fiyat|seansbasi|normal|klinik)\}/g,(_,k)=>al[k]);
   },
 
   /* H-F11: paket satışında hazır paket seçilince alanlara kopyalanacak değerler; paket yoksa null */
@@ -7488,8 +7516,11 @@ const Forms={
   /* ---------- paket önerisi (Sena 10-29): paket seç → mesaj hazırlanır → WhatsApp'ta açılır ---------- */
   paketOner(clientId){
     const c=Store.find('clients',clientId);if(!c)return;
+    const d=Store.paketOnerisiDurumu(c);
     UI.modal('Paket öner — '+c.name,(m,close)=>{
       const b=FormVM.paketOneriBaslangic(clientId);
+      /* Sena 10-29: geri dönmeyen danışana «nasılsınız» hatırlatması + paket; seyrek gelene yalnız paket. Elle de değiştirilebilir */
+      const kalip=UI.seg([['hatirlat','Hatırlatma + paket'],['oneri','Yalnız paket önerisi']],d&&!d.hatirlat?'oneri':'hatirlat',()=>{msgElle=false;yenile()});
       const tpls=Store.col('packages');
       const tpl=UI.select([['','Özel paket'],...tpls.map(p=>[p.id,p.name+' · '+p.sessions+' seans · '+money(p.price)])],b.packageId);
       const sessions=UI.input({value:b.sessions,type:'number',inputmode:'numeric',min:2});
@@ -7501,10 +7532,11 @@ const Forms={
         const o=FormVM.paketOnizleme(sessions.value,price.value,b.birim);
         prev.textContent='';const bb=h('b');bb.textContent=o.baslik;const ss=h('small');ss.textContent=o.alt;
         const bd=h('div');bd.appendChild(bb);bd.appendChild(ss);prev.appendChild(bd);
-        if(!msgElle)msg.value=FormVM.paketOneriMetni(clientId,sessions.value,price.value);
+        if(!msgElle)msg.value=FormVM.paketOneriMetni(clientId,sessions.value,price.value,kalip.dataset.value==='hatirlat');
       };
       tpl.addEventListener('change',()=>{const t=FormVM.paketSablonu(tpl.value);if(t){sessions.value=t.sessions;price.value=t.price}yenile()});
       sessions.addEventListener('input',yenile);price.addEventListener('input',yenile);
+      m.appendChild(UI.field('Mesaj türü',kalip));
       if(tpls.length)m.appendChild(UI.field('Paket',tpl));
       const fr=h('div.frow');fr.appendChild(UI.field('Seans sayısı',sessions));fr.appendChild(UI.field('Paket fiyatı (₺)',price));
       m.appendChild(fr);m.appendChild(prev);
@@ -7516,7 +7548,7 @@ const Forms={
         const wa=h('button.btn',{onclick:()=>{
           if(!(Number(sessions.value)>1)||!(Number(price.value)>0))return UI.toast('Seans sayısı ve fiyat girin','err');
           window.open(waLink(c.phone,msg.value),'_blank');
-          const r=Islem.paketOneriGonderildi(clientId,{sessions:sessions.value,price:price.value});
+          const r=Islem.paketOneriGonderildi(clientId,{sessions:sessions.value,price:price.value,hatirlat:kalip.dataset.value==='hatirlat'});
           close();UI.toast(r.mesaj,'ok');UI.render();
         }});
         wa.appendChild(icon('wa'));wa.appendChild(document.createTextNode(' WhatsApp\'ta aç'));acts.appendChild(wa);
@@ -8067,6 +8099,7 @@ UI.register('hatir',main=>{
       if(s.araVerdi){const ch=h('span.chip.gray');ch.textContent='Ara verdi';end.appendChild(ch)}
       if(s.waHref){const wa=h('a.btn.soft.sm',{href:s.waHref,target:'_blank',onclick:e=>e.stopPropagation(),'aria-label':'WhatsApp – '+s.ad});
         wa.appendChild(icon('wa'));end.appendChild(wa)}
+      if(!s.ulasildi)end.appendChild(h('button.btn.ghost.sm',{onclick:e=>{e.stopPropagation();Forms.paketOner(s.id)}},'Paket öner'));
       if(!s.ulasildi)end.appendChild(h('button.btn.ghost.sm',{onclick:e=>{e.stopPropagation();
         const r=Islem.ulasildiIsaretle(s.id);UI.toast(r.mesaj,r.ok?'ok':'err');ciz()}},'Ulaşıldı'));
       else{const uc=h('span.chip.good');uc.textContent=s.ulasildi;end.appendChild(uc)}
@@ -8533,6 +8566,7 @@ UI.register('set',(main,acilacak)=>{
   const fee=UI.taslakBagla(UI.input({value:gf.defaultFee,type:'number'}));
   const ciftFee=UI.taslakBagla(UI.input({value:gf.coupleFee,type:'number'}));
   const pkT=UI.taslakBagla(h('textarea'));pkT.value=gf.paketOneriSablonu;
+  const pkH=UI.taslakBagla(h('textarea'));pkH.value=gf.paketHatirlatSablonu;
   const weeks=UI.taslakBagla(UI.input({value:gf.inactiveWeeks,type:'number',min:1,max:12}));
   const debtW=UI.taslakBagla(UI.input({value:gf.debtWarn,type:'number'}));
   const waT=UI.taslakBagla(h('textarea'));waT.value=gf.waTemplate;
@@ -8547,11 +8581,12 @@ UI.register('set',(main,acilacak)=>{
   fr2.appendChild(UI.field('Borç uyarı sınırı (₺)',debtW));
   gi.appendChild(fr2);
   gi.appendChild(UI.field('WhatsApp hatırlatma şablonu',waT,'{ad} {tarih} {saat} {klinik} alanları otomatik doldurulur'));
-  gi.appendChild(UI.field('Paket önerisi mesajı',pkT,'{ad} {seans} {fiyat} {seansbasi} {normal} {klinik} alanları otomatik doldurulur'));
+  gi.appendChild(UI.field('Paket önerisi mesajı — seyrek gelenlere',pkT,'{ad} {seans} {fiyat} {seansbasi} {normal} {klinik} alanları otomatik doldurulur'));
+  gi.appendChild(UI.field('Hatırlatma + paket mesajı — bir kez gelip dönmeyenlere / uzaklaşanlara',pkH,'aynı alanlar kullanılır'));
   gi.appendChild(h('button.btn',{onclick:()=>{
     UI.taslakDusur(); /* Islem'in emit'i ekranı normal çizsin */
     const r=Islem.ayarlarKaydet({clinicName:clinic.value,assistantName:asst.value,defaultFee:fee.value,
-      coupleFee:ciftFee.value,paketOneriSablonu:pkT.value,
+      coupleFee:ciftFee.value,paketOneriSablonu:pkT.value,paketHatirlatSablonu:pkH.value,
       inactiveWeeks:weeks.value,debtWarn:debtW.value,waTemplate:waT.value});
     UI.shell();UI.toast(r.mesaj,'ok');
   }},'Kaydet'));
