@@ -5083,6 +5083,9 @@ const OrnekVeri={
     const selin=C('Selin Arslan');const selT=addDays(t,-3);
     selin.paketOnerisi={tarih:selT,seans:5,fiyat:6750,kim:'Sena'};
     selin.temaslar=[{tarih:selT,tur:'paket',kim:'Sena',seans:5,fiyat:6750}];
+    /* sonuçsuz temaslar (Gökhan 10-29): her mesaj dönmez — oran gerçekçi kalsın, «Dönmedi» / «Almadı» da görünsün */
+    C('Derya Şahin').temaslar=[{tarih:addDays(t,-65),tur:'hatirlat',kim:asst}];               // takip hatırlatması, dönmedi
+    C('Murat Kaya').temaslar=[{tarih:addDays(t,-80),tur:'paket',kim:'Sena',seans:5,fiyat:6750}]; // paket önerisi, almadı
 
     Store.touch();
     return {ok:true,mesaj:'Örnek veriler yüklendi'};
