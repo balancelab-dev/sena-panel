@@ -3576,6 +3576,19 @@ const Store={
     for(const p of this.col('payments'))if(p.clientId===clientId)oden+=Number(p.amount)||0;
     return {borc,oden,kalan:borc-oden};
   },
+  /* avansın dökümü (Sena 10-29): kalan<0 iken ne kadarı paketin henüz kullanılmamış seanslarına peşin ödendi, ne kadarı gerçekten fazla ödeme.
+     paket = satılan paket bedelleri − paketten düşülen «geldi» seans ücretleri; fazla = avans − paket (≥0) */
+  avansDokumu(clientId){
+    const kalan=this.balance(clientId).kalan;
+    const satis=this.col('packageSales').filter(s=>s.clientId===clientId);
+    let paket=0,seans=0;
+    for(const s of satis){paket+=Number(s.price)||0;seans+=this.saleUsage(s).remaining}
+    for(const a of this.col('appointments'))
+      if(a.clientId===clientId&&a.status==='geldi'&&a.packageSaleId&&satis.some(s=>s.id===a.packageSaleId))paket-=Number(a.fee)||0;
+    const avans=Math.max(0,-kalan);
+    paket=Math.max(0,Math.min(paket,avans));
+    return {avans,paket,paketSeans:seans,fazla:avans-paket};
+  },
 
   clientStats(clientId){
     const apps=this.col('appointments').filter(a=>a.clientId===clientId);
@@ -5267,7 +5280,7 @@ const DanisanVM={
   detay(id,ctx){
     const c=Store.find('clients',id);
     if(!c||c.deleted)return null;
-    const st=Store.clientStats(id);const b=Store.balance(id);
+    const st=Store.clientStats(id);const b=Store.balance(id);const av=Store.avansDokumu(id);
 
     /* H-C3 */
     const durum={metin:c.status==='aktif'?'Aktif':c.status==='pasif'?'Ara verdi':'Tamamlandı',
@@ -5293,7 +5306,10 @@ const DanisanVM={
       {etiket:'Gelmedi',deger:num(st.noshow),sinif:st.noshow>0?'neg':''},
       {etiket:'Revize / erteleme',deger:num(st.revize),sinif:''},
       {etiket:'Seans ücreti',deger:money(c.fee||Store.data.settings.defaultFee),sinif:''},
-      {etiket:b.kalan>0?'Açık bakiye':'Bakiye',deger:b.kalan>0?money(b.kalan):'Kapalı ✓',sinif:b.kalan>0?'neg':'pos'}
+      b.kalan>0?{etiket:'Açık bakiye',deger:money(b.kalan),sinif:'neg'}
+        :av.fazla>0?{etiket:'Fazla ödeme (alacağı)',deger:money(av.fazla),sinif:'neg'}
+        :av.paket>0?{etiket:'Paket peşin ödendi',deger:money(av.paket),sinif:'pos'}
+        :{etiket:'Bakiye',deger:'Kapalı ✓',sinif:'pos'}
     ];
 
     /* H-C6: hesap dökümü (en yeni önce, ilk 25) */
@@ -6197,10 +6213,15 @@ const FormVM={
     const c=Store.find('clients',clientId);
     if(!c)return null;
     const b=Store.balance(c.id);
+    const av=Store.avansDokumu(c.id);
+    /* Sena 10-29: avans «Hesap kapalı» diye gizlenmez — paket peşini ile fazla ödeme ayrı söylenir */
+    const paketMetni=av.paket>0?' · pakette '+av.paketSeans+' seans peşin ödendi ('+money(av.paket)+')':'';
     return {
-      sinif:b.kalan>0?'warn':'good',
-      baslik:b.kalan>0?'Açık bakiye: '+money(b.kalan):'Hesap kapalı ✓',
-      alt:'Toplam '+money(b.borc)+' işlendi · '+money(b.oden)+' ödendi'
+      sinif:b.kalan>0||av.fazla>0?'warn':'good',
+      baslik:b.kalan>0?'Açık bakiye: '+money(b.kalan)
+        :av.fazla>0?'Fazla ödeme: '+money(av.fazla)+' — danışanın alacağı'
+        :av.paket>0?'Paketten peşin ödendi ✓':'Hesap kapalı ✓',
+      alt:'Toplam '+money(b.borc)+' işlendi · '+money(b.oden)+' ödendi'+paketMetni
     };
   },
 
@@ -6210,6 +6231,8 @@ const FormVM={
     if(!clientId)return {metin:'',tutar:null};
     const b=Store.balance(clientId);
     if(b.kalan>0)return {metin:'Açık bakiye: '+money(b.kalan),tutar:String(b.kalan)};
+    const av=Store.avansDokumu(clientId);
+    if(av.avans>0)return {metin:'⚠ Danışanın zaten '+money(av.avans)+' avansı var'+(av.paket>0?' (pakette '+av.paketSeans+' seans peşin ödendi)':'')+' — bu giriş fazla ödeme olur',tutar:null};
     return {metin:'Bakiye kapalı — bu giriş avans olur',tutar:null};
   },
 
@@ -7213,7 +7236,7 @@ const Forms={
       }
       const acts=h('div.actions');
       acts.appendChild(h('button.btn.soft',{onclick:()=>{close();Forms.appointment(a)}},'Düzenle'));
-      if(c)acts.appendChild(h('button.btn',{onclick:()=>{close();Forms.payment(c.id,a.fee)}},FormVM.ADLAR.tahsilat));
+      if(c)acts.appendChild(h('button.btn',{onclick:()=>{close();Forms.payment(c.id,FormVM.tahsilatBakiyesi(c.id).tutar)}},FormVM.ADLAR.tahsilat)); // Sena 10-29: seans ücreti değil açık bakiye önerilir (paketli seansa ikinci tahsilat olmasın)
       m.appendChild(acts);
       if(c&&c.phone){
         const wa=h('a.btn.ghost',{href:waLink(c.phone,Islem.waMetni(c,a)),target:'_blank',style:'width:100%;margin-top:9px'});
