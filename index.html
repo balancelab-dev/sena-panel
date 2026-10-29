@@ -7763,21 +7763,28 @@ const Forms={
       yenile();
       const acts=h('div.actions');
       acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
+      const yalniz=()=>kalip.dataset.value==='yalniz';
+      const eksik=()=>!yalniz()&&(!(Number(sessions.value)>1)||!(Number(price.value)>0));
+      /* temas kaydı: yalnız hatırlatma → «ulaşıldı» + temas (Raporlar → Geri kazanım); paketli → paket önerisi kaydı da */
+      const temasKaydet=()=>yalniz()?Islem.ulasildiIsaretle(clientId)
+        :Islem.paketOneriGonderildi(clientId,{sessions:sessions.value,price:price.value,hatirlat:kalip.dataset.value==='hatirlat'});
       if(c.phone){
         const wa=h('button.btn',{onclick:()=>{
-          const yalniz=kalip.dataset.value==='yalniz';
-          if(!yalniz&&(!(Number(sessions.value)>1)||!(Number(price.value)>0)))return UI.toast('Seans sayısı ve fiyat girin','err');
+          if(eksik())return UI.toast('Seans sayısı ve fiyat girin','err');
           window.open(waLink(c.phone,msg.value),'_blank');
-          /* yalnız hatırlatma: «ulaşıldı» + temas (Raporlar → Geri kazanım); paketli: paket önerisi kaydı da */
-          const r=yalniz?Object.assign(Islem.ulasildiIsaretle(clientId),{mesaj:'Hatırlatma WhatsApp\'ta açıldı'})
-            :Islem.paketOneriGonderildi(clientId,{sessions:sessions.value,price:price.value,hatirlat:kalip.dataset.value==='hatirlat'});
-          close();UI.toast(r.mesaj,'ok');UI.render();
+          const r=temasKaydet();
+          close();UI.toast(yalniz()?'Hatırlatma WhatsApp\'ta açıldı':r.mesaj,'ok');UI.render();
         }});
         wa.appendChild(icon('wa'));wa.appendChild(document.createTextNode(' WhatsApp\'ta aç'));acts.appendChild(wa);
       }else{
+        /* telefonsuz danışan (Gökhan 10-29): kopyalamak gönderdi demek değil — temas ancak «Gönderdim» onayıyla yazılır,
+           gönderilmeyen mesaj rapora sonuçsuz temas olarak düşmesin */
         acts.appendChild(h('button.btn',{onclick:()=>{
-          try{navigator.clipboard.writeText(msg.value);UI.toast('Danışanın telefonu yok — mesaj kopyalandı','ok')}
-          catch(e){UI.toast('Danışanın telefonu kayıtlı değil','err')}
+          if(eksik())return UI.toast('Seans sayısı ve fiyat girin','err');
+          try{navigator.clipboard.writeText(msg.value)}catch(e){}
+          close();
+          UI.onay('Mesaj kopyalandı','Danışanın kayıtlı telefonu yok. Mesajı kendi telefonunuzdan gönderdiyseniz «Gönderdim»e basın; Raporlar\'daki geri kazanım bu temasın sonucunu izler.',
+            'Gönderdim',()=>{const r=temasKaydet();UI.toast(r.mesaj,'ok');UI.render()});
         }},'Mesajı kopyala'));
       }
       m.appendChild(acts);
