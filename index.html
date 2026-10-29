@@ -2992,6 +2992,7 @@ const varsayilanUcret=(c,tur)=>{tur=tur||'bireysel';
 const paketTuru=p=>p&&p.tur==='cift'?'cift':'bireysel';
 const ciftEki=p=>paketTuru(p)==='cift'&&!/çift/i.test(p.name||'')?'Çift · ':''; /* adında zaten «çift» varsa tekrar yazılmaz */
 const paketEtiketi=p=>ciftEki(p)+p.name+' · '+p.sessions+' seans · '+money(p.price);
+const HATIRLAT_SABLONU='Merhaba {ad}, nasılsınız? Bir süredir görüşemedik, dilerseniz yeni bir seans planlayabiliriz. 🌿 {klinik}';
 const PAKET_HATIRLAT_SABLONU='Merhaba {ad}, nasılsınız? Umarım her şey yolundadır. Bir süredir görüşemedik; dilerseniz kaldığımız yerden devam edebiliriz. Bu dönem size özel bir paketimiz de var: {seans} seans toplam {fiyat} (seans başı {seansbasi}; normalde {normal}). Uygun olduğunuzda haber vermeniz yeterli. 🌿 {klinik}';
 const PAKET_ONERI_SABLONU='Merhaba {ad}, seanslarımıza daha düzenli devam edebilmeniz için size özel bir paket hazırladık: {seans} seans toplam {fiyat} (seans başı {seansbasi}; normalde {normal}). Dilerseniz bir sonraki görüşmemizde birlikte planlayalım. 🌿 {klinik}';
 const num=n=>(Number(n)||0).toLocaleString('tr-TR');
@@ -3365,7 +3366,7 @@ function blankData(){
     schema:1, updatedAt:nowIso(), settingsUpdatedAt:'', // boş yeni veri gerçek ayarı asla ezmesin
     settings:{
       clinicName:'Sena Psikoloji', assistantName:'Ketty',
-      defaultFee:1500, coupleFee:4500, inactiveWeeks:3, debtWarn:3000, paketOneriSablonu:PAKET_ONERI_SABLONU, paketHatirlatSablonu:PAKET_HATIRLAT_SABLONU,
+      defaultFee:1500, coupleFee:4500, inactiveWeeks:3, debtWarn:3000, paketOneriSablonu:PAKET_ONERI_SABLONU, paketHatirlatSablonu:PAKET_HATIRLAT_SABLONU, hatirlatSablonu:HATIRLAT_SABLONU,
       incomeCategories:['Seans','Süpervizyon','Eğitim/Atölye','Rapor','Diğer'],
       expenseCategories:['Kira','Elektrik','Su','İnternet','Aidat','Isınma','Malzeme','Vergi/SGK','Muhasebe','Temizlik','Diğer'],
       personalCategories:['Market','Ulaşım','Sağlık','Giyim','Eğlence','Abonelikler','Ev','Diğer'],
@@ -3686,7 +3687,8 @@ const Store={
   paketOnerisiDurumu(c,t){
     t=t||todayStr();
     if(c.status!=='aktif'&&c.status!=='pasif')return null;
-    if(c.paketOnerisi&&c.paketOnerisi.tarih&&daysBetween(c.paketOnerisi.tarih,t)<this.PAKET_ONERI_SUSKU)return null;
+    const sonTemas=this.temaslar(c).pop(); /* paket önerisi ya da yalnız hatırlatma — yeni ulaşıldıysa sorulmaz */
+    if(sonTemas&&daysBetween(sonTemas.tarih,t)<this.PAKET_ONERI_SUSKU)return null;
     if(this.activeSale(c.id))return null;
     if(this.col('packageSales').some(x=>x.clientId===c.id&&daysBetween(x.date,t)<=90))return null;
     const tum=this.col('appointments').filter(a=>a.clientId===c.id&&a.status==='geldi'&&a.date<=t).map(a=>a.date).sort();
@@ -4265,11 +4267,6 @@ const Islem={
     if(ayni>=0)liste[ayni]=kayit;else liste.push(kayit);
     return liste;
   },
-  /* hatırlatma WhatsApp'ı açıldı (ana ekran / Hatırlatmalar) — yalnız ölçüm için yazılır, «ulaşıldı» işaretlemez */
-  hatirlatmaAcildi(id,bugun){
-    const temaslar=Islem.temasEkle(id,'hatirlat',null,bugun);
-    if(temaslar)Store.update('clients',id,{temaslar});
-  },
   ulasildiIsaretle(id,bugun){
     if(!Store.find('clients',id))return {ok:false,hata:'Danışan bulunamadı'};
     Store.update('clients',id,{ulasildi:{tarih:bugun||todayStr(),kim:Store.user},temaslar:Islem.temasEkle(id,'hatirlat',null,bugun)});
@@ -4515,7 +4512,7 @@ const Islem={
   ayarlarKaydet(g){
     Object.assign(Store.data.settings,{clinicName:g.clinicName,assistantName:g.assistantName,defaultFee:Number(g.defaultFee)||0,
       coupleFee:Number(g.coupleFee)||0,paketOneriSablonu:g.paketOneriSablonu||PAKET_ONERI_SABLONU,
-      paketHatirlatSablonu:g.paketHatirlatSablonu||PAKET_HATIRLAT_SABLONU,
+      paketHatirlatSablonu:g.paketHatirlatSablonu||PAKET_HATIRLAT_SABLONU,hatirlatSablonu:g.hatirlatSablonu||HATIRLAT_SABLONU,
       inactiveWeeks:Number(g.inactiveWeeks)||3,debtWarn:Number(g.debtWarn)||3000,waTemplate:g.waTemplate});
     Store.touchSettings();
     return {ok:true,mesaj:'Kaydedildi'};
@@ -5093,7 +5090,7 @@ const DashVM={
     if(al.client){
       const klinik=Store.data.settings.clinicName;const ilkAd=al.client.name.split(' ')[0];
       if(al.type==='uzak'&&al.client.phone){
-        eylem={tur:'wa-uzak',danisanId:al.client.id,href:waLink(al.client.phone,HatirlatmaVM.waMetni(al.client))};
+        eylem={tur:'mesaj',danisanId:al.client.id,mesajTuru:'yalniz'}; /* view Forms.paketOner(id,'yalniz') — mesaj penceresi */
       }else if(al.type==='paketOner'){
         eylem={tur:'paketOner',danisanId:al.client.id,etiket:'Paket öner'}; /* view Forms.paketOner(id) açar */
       }else if(al.type==='dogum'&&al.client.phone){
@@ -5159,8 +5156,8 @@ const DashVM={
     const tum=Store.alerts();
     /* Sena 10-29: «hatırlatma + paket» kartı olan danışanın ayrı «uzaklaşıyor» kartı gösterilmez (tek mesaj ikisini de yapar) */
     const pkHat=new Set(tum.filter(al=>al.type==='paketOner'&&al.hatirlat).map(al=>al.client.id));
-    /* hatırlatma + paket mesajı yeni gönderildiyse (PAKET_ONERI_SUSKU gün) «uzaklaşıyor» kartı da susar */
-    tum.forEach(al=>{const po=al.type==='uzak'&&al.client.paketOnerisi;if(po&&po.tarih&&daysBetween(po.tarih,t)<Store.PAKET_ONERI_SUSKU)pkHat.add(al.client.id)});
+    /* mesaj (hatırlatma ya da paket) yeni gönderildiyse (PAKET_ONERI_SUSKU gün) «uzaklaşıyor» kartı da susar */
+    tum.forEach(al=>{if(al.type!=='uzak')return;const st=Store.temaslar(al.client).pop();if(st&&daysBetween(st.tarih,t)<Store.PAKET_ONERI_SUSKU)pkHat.add(al.client.id)});
     return DashVM._ekUyarilar(t,simdi).concat(tum.filter(al=>al.type!=='borc'&&!(al.type==='uzak'&&pkHat.has(al.client.id))&&(kisiselVar||!(al.rec&&al.rec.type==='kisisel')))).sort((a,b)=>sevOrder[a.sev]-sevOrder[b.sev]);
   },
 
@@ -5465,7 +5462,7 @@ const HatirlatmaVM={
   esikSecenekleri:[['30','1 ay'],['60','2 ay'],['90','3 ay']],
   esikSec(v){HatirlatmaVM.esik=Number(v)||30},
   /* «Dikkat gerekenler» de aynı metni kullanır */
-  waMetni(c){return 'Merhaba '+c.name.split(' ')[0]+', nasılsınız? Bir süredir görüşemedik, dilerseniz yeni bir seans planlayabiliriz. 🌿 '+Store.data.settings.clinicName},
+  waMetni(c){const S=Store.data.settings;return (S.hatirlatSablonu||HATIRLAT_SABLONU).replace(/\{(ad|klinik)\}/g,(_,k)=>k==='ad'?c.name.split(' ')[0]:(S.clinicName||''))},
   liste(ctx){
     const t=(ctx&&ctx.bugun)||todayStr();const esik=HatirlatmaVM.esik;
     const satirlar=[],ulasilanlar=[];
@@ -6027,6 +6024,7 @@ const AyarVM={
     const s=Store.data.settings;
     return {clinicName:s.clinicName||'',assistantName:s.assistantName||'',defaultFee:s.defaultFee,coupleFee:turUcreti('cift'),
       paketOneriSablonu:s.paketOneriSablonu||PAKET_ONERI_SABLONU,paketHatirlatSablonu:s.paketHatirlatSablonu||PAKET_HATIRLAT_SABLONU,
+      hatirlatSablonu:s.hatirlatSablonu||HATIRLAT_SABLONU,
       inactiveWeeks:s.inactiveWeeks,debtWarn:s.debtWarn,waTemplate:s.waTemplate||''};
   },
 
@@ -7622,13 +7620,16 @@ const Forms={
   },
 
   /* ---------- paket önerisi (Sena 10-29): paket seç → mesaj hazırlanır → WhatsApp'ta açılır ---------- */
-  paketOner(clientId){
+  /* tur: 'yalniz' (yalnız hatırlatma) | 'hatirlat' (hatırlatma + paket) | 'oneri' (yalnız paket). Verilmezse danışanın durumundan seçilir:
+     geri dönmeyene hatırlatma + paket, seyrek gelene yalnız paket. Ana ekran ve Hatırlatmalar'daki WhatsApp düğmeleri 'yalniz' ile açar. */
+  paketOner(clientId,tur){
     const c=Store.find('clients',clientId);if(!c)return;
     const d=Store.paketOnerisiDurumu(c);
-    UI.modal('Paket öner — '+c.name,(m,close)=>{
+    UI.modal('WhatsApp mesajı — '+c.name,(m,close)=>{
       const b=FormVM.paketOneriBaslangic(clientId);
-      /* Sena 10-29: geri dönmeyen danışana «nasılsınız» hatırlatması + paket; seyrek gelene yalnız paket. Elle de değiştirilebilir */
-      const kalip=UI.seg([['hatirlat','Hatırlatma + paket'],['oneri','Yalnız paket önerisi']],d&&!d.hatirlat?'oneri':'hatirlat',()=>{msgElle=false;yenile()});
+      const kalip=UI.seg([['yalniz','Yalnız hatırlatma'],['hatirlat','Hatırlatma + paket'],['oneri','Yalnız paket']],
+        tur||(d&&!d.hatirlat?'oneri':'hatirlat'),()=>{msgElle=false;yenile()});
+      const paketKutu=h('div');
       const tpls=Store.col('packages').filter(p=>paketTuru(p)===(c.tur==='cift'?'cift':'bireysel'));
       const tpl=UI.select([['','Özel paket'],...tpls.map(p=>[p.id,paketEtiketi(p)])],b.packageId);
       const sessions=UI.input({value:b.sessions,type:'number',inputmode:'numeric',min:2});
@@ -7637,26 +7638,31 @@ const Forms={
       const msg=h('textarea',{rows:6});
       let msgElle=false;msg.addEventListener('input',()=>{msgElle=true});
       const yenile=()=>{
+        const yalniz=kalip.dataset.value==='yalniz';
+        paketKutu.classList.toggle('hide',yalniz);
         const o=FormVM.paketOnizleme(sessions.value,price.value,b.birim);
         prev.textContent='';const bb=h('b');bb.textContent=o.baslik;const ss=h('small');ss.textContent=o.alt;
         const bd=h('div');bd.appendChild(bb);bd.appendChild(ss);prev.appendChild(bd);
-        if(!msgElle)msg.value=FormVM.paketOneriMetni(clientId,sessions.value,price.value,kalip.dataset.value==='hatirlat');
+        if(!msgElle)msg.value=yalniz?HatirlatmaVM.waMetni(c):FormVM.paketOneriMetni(clientId,sessions.value,price.value,kalip.dataset.value==='hatirlat');
       };
       tpl.addEventListener('change',()=>{const t=FormVM.paketSablonu(tpl.value);if(t){sessions.value=t.sessions;price.value=t.price}yenile()});
       sessions.addEventListener('input',yenile);price.addEventListener('input',yenile);
       m.appendChild(UI.field('Mesaj türü',kalip));
-      if(tpls.length)m.appendChild(UI.field('Paket',tpl));
+      if(tpls.length)paketKutu.appendChild(UI.field('Paket',tpl));
       const fr=h('div.frow');fr.appendChild(UI.field('Seans sayısı',sessions));fr.appendChild(UI.field('Paket fiyatı (₺)',price));
-      m.appendChild(fr);m.appendChild(prev);
+      paketKutu.appendChild(fr);paketKutu.appendChild(prev);m.appendChild(paketKutu);
       m.appendChild(UI.field('Mesaj',msg,'gönderilmeden önce düzenleyebilirsiniz · kalıp Ayarlar → Genel\'den değişir'));
       yenile();
       const acts=h('div.actions');
       acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
       if(c.phone){
         const wa=h('button.btn',{onclick:()=>{
-          if(!(Number(sessions.value)>1)||!(Number(price.value)>0))return UI.toast('Seans sayısı ve fiyat girin','err');
+          const yalniz=kalip.dataset.value==='yalniz';
+          if(!yalniz&&(!(Number(sessions.value)>1)||!(Number(price.value)>0)))return UI.toast('Seans sayısı ve fiyat girin','err');
           window.open(waLink(c.phone,msg.value),'_blank');
-          const r=Islem.paketOneriGonderildi(clientId,{sessions:sessions.value,price:price.value,hatirlat:kalip.dataset.value==='hatirlat'});
+          /* yalnız hatırlatma: «ulaşıldı» + temas (Raporlar → Geri kazanım); paketli: paket önerisi kaydı da */
+          const r=yalniz?Object.assign(Islem.ulasildiIsaretle(clientId),{mesaj:'Hatırlatma WhatsApp\'ta açıldı'})
+            :Islem.paketOneriGonderildi(clientId,{sessions:sessions.value,price:price.value,hatirlat:kalip.dataset.value==='hatirlat'});
           close();UI.toast(r.mesaj,'ok');UI.render();
         }});
         wa.appendChild(icon('wa'));wa.appendChild(document.createTextNode(' WhatsApp\'ta aç'));acts.appendChild(wa);
@@ -7841,9 +7847,11 @@ UI.register('dash',main=>{
     const ey=al.eylem;
     if(ey){
       const act=h('div.act');
-      if(ey.tur==='wa-uzak'||ey.tur==='wa-dogum'){
-        const wa=h('a.btn.soft.sm',{href:ey.href,target:'_blank','aria-label':'WhatsApp – '+al.baslik,
-          onclick:()=>{if(ey.tur==='wa-uzak'&&ey.danisanId)Islem.hatirlatmaAcildi(ey.danisanId)}});
+      if(ey.tur==='wa-dogum'){
+        const wa=h('a.btn.soft.sm',{href:ey.href,target:'_blank','aria-label':'WhatsApp – '+al.baslik});
+        wa.appendChild(icon('wa'));act.appendChild(wa);
+      }else if(ey.tur==='mesaj'){
+        const wa=h('button.btn.soft.sm',{onclick:()=>Forms.paketOner(ey.danisanId,ey.mesajTuru),'aria-label':'WhatsApp mesajı – '+al.baslik});
         wa.appendChild(icon('wa'));act.appendChild(wa);
       }else if(ey.tur==='ac'){
         act.appendChild(h('button.btn.soft.sm',{onclick:()=>UI.go('clients',ey.danisanId)},ey.etiket));
@@ -8212,9 +8220,8 @@ UI.register('hatir',main=>{
       const sm=h('small');sm.textContent=s.aciklama;bd.appendChild(sm);
       const end=h('div.end',{style:'display:flex;gap:6px;align-items:center'});
       if(s.araVerdi){const ch=h('span.chip.gray');ch.textContent='Ara verdi';end.appendChild(ch)}
-      if(s.waHref){const wa=h('a.btn.soft.sm',{href:s.waHref,target:'_blank',onclick:e=>{e.stopPropagation();Islem.hatirlatmaAcildi(s.id)},'aria-label':'WhatsApp – '+s.ad});
+      if(s.waHref){const wa=h('button.btn.soft.sm',{onclick:e=>{e.stopPropagation();Forms.paketOner(s.id,'yalniz')},'aria-label':'WhatsApp mesajı – '+s.ad});
         wa.appendChild(icon('wa'));end.appendChild(wa)}
-      if(!s.ulasildi)end.appendChild(h('button.btn.ghost.sm',{onclick:e=>{e.stopPropagation();Forms.paketOner(s.id)}},'Paket öner'));
       if(!s.ulasildi)end.appendChild(h('button.btn.ghost.sm',{onclick:e=>{e.stopPropagation();
         const r=Islem.ulasildiIsaretle(s.id);UI.toast(r.mesaj,r.ok?'ok':'err');ciz()}},'Ulaşıldı'));
       else{const uc=h('span.chip.good');uc.textContent=s.ulasildi;end.appendChild(uc)}
@@ -8712,6 +8719,7 @@ UI.register('set',(main,acilacak)=>{
   const ciftFee=UI.taslakBagla(UI.input({value:gf.coupleFee,type:'number'}));
   const pkT=UI.taslakBagla(h('textarea'));pkT.value=gf.paketOneriSablonu;
   const pkH=UI.taslakBagla(h('textarea'));pkH.value=gf.paketHatirlatSablonu;
+  const hatT=UI.taslakBagla(h('textarea'));hatT.value=gf.hatirlatSablonu;
   const weeks=UI.taslakBagla(UI.input({value:gf.inactiveWeeks,type:'number',min:1,max:12}));
   const debtW=UI.taslakBagla(UI.input({value:gf.debtWarn,type:'number'}));
   const waT=UI.taslakBagla(h('textarea'));waT.value=gf.waTemplate;
@@ -8726,12 +8734,13 @@ UI.register('set',(main,acilacak)=>{
   fr2.appendChild(UI.field('Borç uyarı sınırı (₺)',debtW));
   gi.appendChild(fr2);
   gi.appendChild(UI.field('WhatsApp hatırlatma şablonu',waT,'{ad} {tarih} {saat} {klinik} alanları otomatik doldurulur'));
+  gi.appendChild(UI.field('Yalnız hatırlatma mesajı — uzun süredir gelmeyenlere',hatT,'{ad} {klinik} alanları otomatik doldurulur'));
   gi.appendChild(UI.field('Paket önerisi mesajı — seyrek gelenlere',pkT,'{ad} {seans} {fiyat} {seansbasi} {normal} {klinik} alanları otomatik doldurulur'));
   gi.appendChild(UI.field('Hatırlatma + paket mesajı — bir kez gelip dönmeyenlere / uzaklaşanlara',pkH,'aynı alanlar kullanılır'));
   gi.appendChild(h('button.btn',{onclick:()=>{
     UI.taslakDusur(); /* Islem'in emit'i ekranı normal çizsin */
     const r=Islem.ayarlarKaydet({clinicName:clinic.value,assistantName:asst.value,defaultFee:fee.value,
-      coupleFee:ciftFee.value,paketOneriSablonu:pkT.value,paketHatirlatSablonu:pkH.value,
+      coupleFee:ciftFee.value,paketOneriSablonu:pkT.value,paketHatirlatSablonu:pkH.value,hatirlatSablonu:hatT.value,
       inactiveWeeks:weeks.value,debtWarn:debtW.value,waTemplate:waT.value});
     UI.shell();UI.toast(r.mesaj,'ok');
   }},'Kaydet'));
