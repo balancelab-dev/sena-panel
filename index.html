@@ -77,7 +77,7 @@ h1,h2,h3{font-weight:650;letter-spacing:-.01em}
 .brand .logo{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#a8c3ab,#7fa389);
   color:#fffdf9;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:19px}
 .brand b{font-size:16.5px;display:block;line-height:1.15}
-.brand small{color:var(--muted);font-size:11.5px;font-weight:500}
+.brand small{color:var(--muted);font-size:12px;font-weight:500}
 .nav{display:flex;flex-direction:column;gap:2px;margin-top:4px}
 .nav button{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:12px;
   color:var(--ink-2);font-weight:550;font-size:14px;text-align:left;width:100%}
@@ -96,7 +96,7 @@ h1,h2,h3{font-weight:650;letter-spacing:-.01em}
 @keyframes pulse{50%{opacity:.35}}
 .userchip{display:flex;align-items:center;gap:9px;padding:10px 12px;margin-top:8px;border-radius:12px;background:var(--card-2);border:1px solid var(--line)}
 .userchip .av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;color:var(--ink)}
-.userchip small{color:var(--muted);font-size:11px;display:block}
+.userchip small{color:var(--muted);font-size:12px;display:block}
 .userchip b{font-size:13px}
 
 /* üst bar */
@@ -119,13 +119,13 @@ h1,h2,h3{font-weight:650;letter-spacing:-.01em}
   .mobile-top{display:flex;align-items:center;gap:10px;padding:12px max(16px,env(safe-area-inset-right)) 4px max(16px,env(safe-area-inset-left))}
   .mobile-top .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#a8c3ab,#7fa389);color:#fffdf9;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:17px}
   .mobile-top b{font-size:15.5px}
-  .mobile-top small{display:block;color:var(--muted);font-size:11px}
+  .mobile-top small{display:block;color:var(--muted);font-size:12px}
   .mobile-top .grow{flex:1}
   .tabbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:40;background:rgba(255,253,249,.92);
     backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);
     padding:6px max(4px,env(safe-area-inset-right)) calc(6px + var(--safe-b)) max(4px,env(safe-area-inset-left))}
   .tabbar button{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 2px;
-    font-size:11px;font-weight:600;color:var(--muted);border-radius:10px}
+    font-size:12px;font-weight:600;color:var(--muted);border-radius:10px}
   .tabbar button svg{width:22px;height:22px}
   .tabbar button.on{color:var(--brand-2)}
   .topbar h1{font-size:19px}
@@ -147,9 +147,9 @@ h3 svg,h2 svg,summary svg{width:17px;height:17px;flex:0 0 17px;color:var(--brand
 .stat{padding:14px 16px}
 .stat .lbl{font-size:12px;color:var(--ink-2);font-weight:550}
 .stat .val{font-size:24px;font-weight:680;margin-top:3px;letter-spacing:-.02em}
-.stat .delta{font-size:11.5px;font-weight:600;margin-top:2px;display:inline-flex;align-items:center;gap:3px}
+.stat .delta{font-size:12px;font-weight:600;margin-top:2px;display:inline-flex;align-items:center;gap:3px}
 .stat .delta.iyi{color:var(--good)}.stat .delta.kotu{color:var(--crit)}.stat .delta.flat{color:var(--muted)}
-.stat .delta-taban{font-size:11px;color:var(--muted);margin-top:1px}
+.stat .delta-taban{font-size:12px;color:var(--muted);margin-top:1px}
 .stat .spark{margin-top:6px}
 @media(max-width:560px){.stat .val{font-size:20px}}
 
@@ -162,6 +162,8 @@ h3 svg,h2 svg,summary svg{width:17px;height:17px;flex:0 0 17px;color:var(--brand
 .btn.soft{background:var(--brand-soft);color:var(--brand-2)}
 @media(hover:hover){.btn.soft:hover{background:var(--brand-soft-2)}}
 .btn.danger{background:var(--crit-soft);color:var(--crit)}
+.btn.danger-dolu{background:var(--crit);color:#fff;border-color:transparent} /* geri alınamaz işlerin onay düğmesi (paket iptali): tam kırmızı */
+@media(hover:hover){.btn.danger-dolu:hover{background:#9a3030}}
 .btn.sm{padding:6px 11px;font-size:12.5px;border-radius:10px}
 .btn.icon{padding:9px;border-radius:12px}
 .btn svg{width:16px;height:16px}
@@ -169,7 +171,7 @@ h3 svg,h2 svg,summary svg{width:17px;height:17px;flex:0 0 17px;color:var(--brand
 .btn:active:not(:disabled){transform:scale(.97)}
 
 /* rozet & çip */
-.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:600}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600}
 .chip.sage{background:var(--p-sage);color:var(--p-sage-ink)}
 .chip.blush{background:var(--p-blush);color:var(--p-blush-ink)}
 .chip.sky{background:var(--p-sky);color:var(--p-sky-ink)}
@@ -204,7 +206,7 @@ h3 svg,h2 svg,summary svg{width:17px;height:17px;flex:0 0 17px;color:var(--brand
 .row .body small{color:var(--muted);font-size:12px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row .end{text-align:right;flex-shrink:0}
 .row .end b{font-size:14px;display:block}
-.row .end small{font-size:11.5px;color:var(--muted)}
+.row .end small{font-size:12px;color:var(--muted)}
 .row.click{cursor:pointer;border-radius:10px;margin:0 -6px;padding:11px 12px}
 @media(hover:hover){.row.click:hover{background:var(--card-2)}}
 .row.click:active{background:var(--card-2)}
@@ -218,7 +220,7 @@ h3 svg,h2 svg,summary svg{width:17px;height:17px;flex:0 0 17px;color:var(--brand
   border-radius:11px;background:var(--card);font-size:14.5px}
 .field textarea{min-height:70px;resize:vertical}
 .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 2px var(--brand)}
-.field .help{font-size:11.5px;color:var(--muted);margin-top:4px}
+.field .help{font-size:12px;color:var(--muted);margin-top:4px}
 /* «Ücretsiz seans» kutucuğu (randevu formu) — dokunma alanı ≥44px */
 .chk{display:flex;align-items:center;gap:10px;min-height:44px;margin:-6px 0 8px;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer}
 .chk input{width:20px;height:20px;accent-color:var(--brand);margin:0}
@@ -243,18 +245,22 @@ h3 svg,h2 svg,summary svg{width:17px;height:17px;flex:0 0 17px;color:var(--brand
 .modal .actions .btn{flex:1}
 
 /* toast */
-#toasts{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:90;display:flex;flex-direction:column;gap:8px;width:min(92vw,380px)}
+#toasts{position:fixed;bottom:calc(20px + var(--safe-b));left:50%;transform:translateX(-50%);z-index:90;display:flex;flex-direction:column;gap:8px;width:min(92vw,380px)}
+@media(max-width:900px){#toasts{bottom:calc(76px + var(--safe-b))}} /* telefonda sekme çubuğunun (≈62px) ve güvenli alanın üstü */
 .toast{background:var(--ink);color:#fdfcf9;padding:11px 16px;border-radius:13px;font-size:13.5px;font-weight:550;
   box-shadow:var(--shadow-lg);display:flex;gap:9px;align-items:center;animation:tin .25s}
 .toast.err{background:#8f3232}
 .toast.ok{background:var(--brand-2)}
-@keyframes tin{from{opacity:0;transform:translateY(-8px)}}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}}
+.toast .toast-eylem{margin-left:auto;min-height:44px;min-width:44px;padding:0 10px;margin-top:-11px;margin-bottom:-11px;margin-right:-8px;color:#fff;font-weight:700;font-size:13.5px;text-decoration:underline;border-radius:10px}
+.toast .toast-eylem:focus-visible{outline:2px solid #fff;outline-offset:-2px}
+.field label .zorunlu{color:var(--crit);margin-left:3px;font-weight:700}
 
 /* ============ takvim ============ */
 .cal-head{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
 .cal-head h2{font-size:16.5px;min-width:150px;text-transform:capitalize}
 .cal-month{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
-.cal-month .dow{text-align:center;font-size:11px;font-weight:650;color:var(--muted);padding:4px 0;text-transform:uppercase}
+.cal-month .dow{text-align:center;font-size:12px;font-weight:650;color:var(--muted);padding:4px 0;text-transform:uppercase}
 .cal-cell{min-height:74px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:5px 6px;cursor:pointer;position:relative;overflow:hidden}
 @media(hover:hover){.cal-cell:hover{border-color:var(--line-2);background:var(--card-2)}}
 .cal-cell:active{background:var(--card-2)}
@@ -262,9 +268,9 @@ h3 svg,h2 svg,summary svg{width:17px;height:17px;flex:0 0 17px;color:var(--brand
 .cal-cell.dim .d{color:var(--muted)}
 .cal-cell.today{border-color:var(--brand);box-shadow:0 0 0 1px var(--brand)}
 .cal-cell .d{font-size:12px;font-weight:650;color:var(--ink-2)}
-.cal-cell .evt{font-size:11px;font-weight:600;padding:1.5px 5px;border-radius:5px;margin-top:2.5px;
+.cal-cell .evt{font-size:12px;font-weight:600;padding:1.5px 5px;border-radius:5px;margin-top:2.5px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cal-cell .more{font-size:11px;color:var(--muted);margin-top:2px;font-weight:600}
+.cal-cell .more{font-size:12px;color:var(--muted);margin-top:2px;font-weight:600}
 @media(max-width:900px){.cal-cell{min-height:56px;padding:3px 4px}.cal-cell .evt{display:none}
   .cal-cell .pips{display:flex;gap:2.5px;flex-wrap:wrap;margin-top:3px}
   .cal-cell .pip{width:6px;height:6px;border-radius:50%}}
@@ -275,7 +281,7 @@ h3 svg,h2 svg,summary svg{width:17px;height:17px;flex:0 0 17px;color:var(--brand
 .day-list .hr{width:46px;flex:0 0 46px;text-align:right;font-size:12px;color:var(--muted);font-weight:600;padding-top:8px}
 .appt{flex:1;border-radius:12px;padding:9px 13px;display:flex;align-items:center;gap:10px;cursor:pointer;border-left:4px solid transparent}
 .appt b{font-size:13.5px}
-.appt small{display:block;color:var(--ink-2);font-size:11.5px}
+.appt small{display:block;color:var(--ink-2);font-size:12px}
 .appt .st{margin-left:auto;flex-shrink:0}
 .appt.planlandi{background:var(--p-sky);border-color:var(--s1)}
 .appt.geldi{background:var(--good-soft);border-color:var(--good)}
@@ -288,19 +294,19 @@ h3 svg,h2 svg,summary svg{width:17px;height:17px;flex:0 0 17px;color:var(--brand
 .week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
 .week-col{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:7px;min-height:120px}
 .week-col.today{border-color:var(--brand)}
-.week-col .wd{font-size:11px;font-weight:700;color:var(--ink-2);text-align:center;margin-bottom:5px}
-.week-col .wd small{display:block;font-weight:500;color:var(--muted);font-size:11px}
-.week-col .evt{font-size:11px;font-weight:600;border-radius:7px;padding:3px 6px;margin-bottom:3px;cursor:pointer;
+.week-col .wd{font-size:12px;font-weight:700;color:var(--ink-2);text-align:center;margin-bottom:5px}
+.week-col .wd small{display:block;font-weight:500;color:var(--muted);font-size:12px}
+.week-col .evt{font-size:12px;font-weight:600;border-radius:7px;padding:3px 6px;margin-bottom:3px;cursor:pointer;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media(max-width:900px){.week-grid{display:none}}
 
 /* ============ grafikler ============ */
 .viz{position:relative}
 .viz svg{display:block;width:100%;height:auto}
-.viz .axis{font-size:11px;fill:var(--muted)}
+.viz .axis{font-size:12px;fill:var(--muted)}
 .viz .grid-l{stroke:var(--line);stroke-width:1}
 .viz .base-l{stroke:var(--line-2);stroke-width:1}
-.viz .dlabel{font-size:11px;font-weight:650;fill:var(--ink-2)}
+.viz .dlabel{font-size:12px;font-weight:650;fill:var(--ink-2)}
 .viz-tip{position:absolute;pointer-events:none;background:var(--ink);color:#fdfcf9;border-radius:10px;
   padding:8px 11px;font-size:12px;z-index:30;box-shadow:var(--shadow-lg);opacity:0;transition:opacity .1s;min-width:110px}
 .viz-tip .t{font-size:10.5px;color:#c9c4bb;font-weight:600;margin-bottom:3px}
@@ -311,7 +317,7 @@ h3 svg,h2 svg,summary svg{width:17px;height:17px;flex:0 0 17px;color:var(--brand
 .legend span{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-2);font-weight:550}
 .legend i{width:11px;height:11px;border-radius:3.5px}
 .legend i.line{height:3px;border-radius:2px;width:14px}
-.tbl-toggle{font-size:11.5px;color:var(--muted);font-weight:600;margin-left:auto}
+.tbl-toggle{font-size:12px;color:var(--muted);font-weight:600;margin-left:auto}
 .viz-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px}
 .viz-table th{text-align:left;color:var(--muted);font-weight:600;padding:5px 8px;border-bottom:1px solid var(--line)}
 .viz-table td{padding:5px 8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
@@ -320,7 +326,7 @@ h3 svg,h2 svg,summary svg{width:17px;height:17px;flex:0 0 17px;color:var(--brand
 
 /* rapor tablosu */
 table.data{width:100%;border-collapse:collapse;font-size:13px}
-table.data th{text-align:left;font-size:11.5px;color:var(--muted);font-weight:650;padding:7px 8px;border-bottom:1px solid var(--line-2);text-transform:uppercase;letter-spacing:.03em}
+table.data th{text-align:left;font-size:12px;color:var(--muted);font-weight:650;padding:7px 8px;border-bottom:1px solid var(--line-2);text-transform:uppercase;letter-spacing:.03em}
 table.data td{padding:8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
 table.data td.num,table.data th.num{text-align:right}
 table.data tr:last-child td{border-bottom:none}
@@ -340,7 +346,7 @@ table.data tr:last-child td{border-bottom:none}
 .who button .av{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--ink);font-weight:700;font-size:16px}
 .who button.on{border-color:var(--brand);background:var(--brand-soft);color:var(--brand-2)}
 .gate-err{background:var(--crit-soft);color:var(--crit);border-radius:11px;padding:9px 13px;font-size:12.5px;font-weight:600;margin-bottom:12px;display:none}
-.gate-note{font-size:11.5px;color:var(--muted);text-align:center;margin-top:14px;line-height:1.5}
+.gate-note{font-size:12px;color:var(--muted);text-align:center;margin-top:14px;line-height:1.5}
 /* D3a — kilit kartı: uzun içerik (klavye açık / kısa ekran) yukarıdan kesilmez, kartın içi kayar; yeni modlar */
 #gate{align-items:flex-start}
 .gate-card{margin:auto}
@@ -380,7 +386,7 @@ table.data tr:last-child td{border-bottom:none}
 .pos{color:var(--good)}.neg{color:var(--crit)}
 .hide{display:none!important}
 .searchbox{position:relative;flex:1;max-width:320px}
-.rozet{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--crit);color:#fff;font-size:11px;font-weight:700;line-height:18px;text-align:center}
+.rozet{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--brand);color:#fff;font-size:12px;font-weight:700;line-height:18px;text-align:center}
 .nav button .rozet{margin-left:auto}
 .tabbar button{position:relative}
 .tabbar button .rozet{position:absolute;top:1px;left:calc(50% + 6px)}
@@ -459,10 +465,11 @@ select:disabled{opacity:.45}
 /* K3b2: telefon üst bar eşitleme durumu · takvim ay görünümü toplam metni + lejant */
 .mobile-top small .err{color:var(--crit);font-weight:650}
 .cal-cell .toplam{display:none}
+.cal-cell .toplam .kelime{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap} /* görünmez ama okunur: dar hücrede yalnız sayı */
 @media(max-width:900px){
   .cal-cell .more{display:none}
   .cal-cell{padding:3px}
-  .cal-cell .toplam{display:block;font-size:11px;line-height:1.15;color:var(--ink-2);font-weight:650;margin-top:2px;letter-spacing:-.1px} /* dar hücrede iki satıra bölünür: «4» / «randevu» */
+  .cal-cell .toplam{display:block;font-size:12px;line-height:1.15;color:var(--ink-2);font-weight:650;margin-top:2px;letter-spacing:-.1px} /* dar hücrede iki satıra bölünür: «4» / «randevu» */
 }
 .cal-lejant{margin-top:12px}
 /* telefonda form dışı seçici şeritler (süzgeç, sekme) tek satır kalır, sığmazsa yana kayar (masa, K3b2) */
@@ -473,33 +480,33 @@ select:disabled{opacity:.45}
    Telefon ASIL görünümdür (≤900): dikey mini akış + açılır «Her 100 ₺» listesi. Masaüstü (≥901): Sankey + koyu «Her 100 ₺» paneli. */
 .akis{margin-bottom:14px;padding:20px 22px}
 .akis-ust{display:flex;align-items:flex-end;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
-.akis-goz{font-size:11px;font-weight:650;letter-spacing:.12em;color:var(--muted)}
+.akis-goz{font-size:12px;font-weight:650;letter-spacing:.12em;color:var(--muted)}
 .card h3.akis-baslik{display:block;font-size:26px;line-height:1.15;letter-spacing:-.02em;margin:4px 0 0}
 .akis-cumle{margin:14px 0 4px;font-size:15px;line-height:1.5;color:var(--ink-2);max-width:64ch}
 .akis .empty{padding:22px 0 6px}
 .akis-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0 6px}
 .akis-kpi-kart{background:var(--card-2);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
 .akis-kpi-kart.vurgulu{background:var(--ink);border-color:var(--ink);color:#fdfcf9}
-.akis-kpi-et{font-size:11px;font-weight:650;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.akis-kpi-et{font-size:12px;font-weight:650;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .akis-kpi-de{font-size:22px;font-weight:750;letter-spacing:-.02em;margin-top:4px;font-variant-numeric:tabular-nums}
 .akis-kpi-ek{font-size:12px;color:var(--muted);margin-top:2px}
 .akis-kpi-kart.vurgulu .akis-kpi-et,.akis-kpi-kart.vurgulu .akis-kpi-ek{color:#d9d3c8}
 .akis-govde{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;margin-top:12px}
 .akis-sankey,.akis-mini{min-width:0}
 /* SVG yazıları (diyagramlar) */
-.akis-et{font-size:11px;font-weight:650;letter-spacing:.08em;fill:var(--muted)}
+.akis-et{font-size:12px;font-weight:650;letter-spacing:.08em;fill:var(--muted)}
 .akis-tu{font-size:15px;font-weight:750;fill:var(--ink)}
 .akis-tu.orta{font-size:17px}
 .akis-tu.buyuk{font-size:24px}
 .akis-tu.kalan{font-size:26px;fill:var(--brand-2)}
 .akis-mini .akis-tu.kalan{font-size:20px}
-.akis-yz{font-size:11px;font-weight:650;fill:var(--muted)}
+.akis-yz{font-size:12px;font-weight:650;fill:var(--muted)}
 .akis-sankey text{paint-order:stroke;stroke:var(--card);stroke-width:3px;stroke-linejoin:round}
 .akis-sankey .baglanti{transition:fill-opacity .12s}
 @media(hover:hover){.akis-sankey .baglanti:hover{fill-opacity:.6}}
 /* «Her 100 ₺» */
 .akis-yuz{background:var(--card-2);border:1px solid var(--line);border-radius:16px;padding:14px 16px 6px}
-.akis-yuz-et{font-size:11px;font-weight:650;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.akis-yuz-et{font-size:12px;font-weight:650;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .akis-yuz-donem,.akis-yuz-100{display:none}
 .akis-grup{border-top:1px solid var(--line)}
 .akis-yuz-et+.akis-grup{margin-top:6px}
@@ -584,10 +591,10 @@ details.acc[open] summary::after{transform:rotate(-135deg)}
 }
 .card{background:linear-gradient(180deg,#fffdf9,#faf5ec);border:none;border-radius:18px;
   box-shadow:0 4px 0 #ded4c1,0 12px 24px -14px rgba(60,50,35,.32),inset 0 1px 0 #fff}
-.btn{background:linear-gradient(180deg,#5d8868,#47684f);border:none;border-radius:11px;
+.btn{background:linear-gradient(180deg,#4f7458,#47684f);border:none;border-radius:11px;
   box-shadow:0 4px 0 #395441,inset 0 1px 0 rgba(255,255,255,.28);
   transition:transform .08s,box-shadow .08s,background .12s}
-@media(hover:hover){.btn:hover{background:linear-gradient(180deg,#67926f,#4f7358);transform:translateY(-1px);
+@media(hover:hover){.btn:hover{background:linear-gradient(180deg,#587c5e,#4f7358);transform:translateY(-1px);
   box-shadow:0 5px 0 #395441,0 8px 16px -6px rgba(50,70,55,.4),inset 0 1px 0 rgba(255,255,255,.32)}}
 .btn:active{transform:translateY(3px);box-shadow:0 1px 0 #395441,inset 0 2px 3px rgba(0,0,0,.18)}
 .btn.ghost{background:linear-gradient(180deg,#fffdf9,#f3ede1);color:#4a453e;
@@ -4307,9 +4314,17 @@ const Islem={
     return liste;
   },
   ulasildiIsaretle(id,bugun){
-    if(!Store.find('clients',id))return {ok:false,hata:'Danışan bulunamadı'};
+    const c=Store.find('clients',id);
+    if(!c)return {ok:false,hata:'Danışan bulunamadı'};
+    const onceki=JSON.parse(JSON.stringify({ulasildi:c.ulasildi||null,temaslar:c.temaslar||[]})); /* «Geri al» için işaretlemeden önceki değer */
     Store.update('clients',id,{ulasildi:{tarih:bugun||todayStr(),kim:Store.user},temaslar:Islem.temasEkle(id,'hatirlat',null,bugun)});
-    return {ok:true,mesaj:'Ulaşıldı olarak işaretlendi'};
+    return {ok:true,mesaj:'Ulaşıldı olarak işaretlendi',onceki};
+  },
+  /* «Ulaşıldı»yı geri al (dört göz 2 · C2): ulasildi ve bu işlemin eklediği son temas kaydı, işaretlemeden önceki değerine döner */
+  ulasildiGeriAl(id,onceki){
+    if(!Store.find('clients',id)||!onceki)return {ok:false,hata:'Danışan bulunamadı'};
+    Store.update('clients',id,{ulasildi:onceki.ulasildi||null,temaslar:(onceki.temaslar||[]).slice()});
+    return {ok:true,mesaj:'Ulaşıldı işareti geri alındı'};
   },
   /* g: {name,phone,phone2,fee,birthDate,source,status,notes} (phone2: isteğe bağlı ikinci numara — Sena 10-22) · mevcutId: düzenlenen danışanın id'si (yoksa yeni) */
   danisanKaydet(g,mevcutId){
@@ -5427,7 +5442,7 @@ const TakvimVM={
         hucreler.push({tarih:d,gunNo:String(Number(d.slice(8,10))),ayIci:monthKey(d)===mk,bugunMu:d===t,
           olaylar:l.slice(0,3).map(TakvimVM._olay),
           dahaMetni:l.length>3?'+'+(l.length-3)+' daha':null,
-          toplamMetni:l.length?l.length+' randevu':null, /* K3.8: telefonda olay metni gizli → "+N daha" yerine toplam; hangisi görünür CSS'in işi */
+          toplamMetni:l.length?l.length+' randevu':null,toplamSayi:l.length, /* K3.8: telefonda olay metni gizli → "+N daha" yerine toplam; hangisi görünür CSS'in işi */
           erisimAdi:fmtD(d)+(l.length?', '+l.length+' randevu':', randevu yok'),
           noktalar:l.slice(0,5).map(a=>a.status)});
       }
@@ -5961,7 +5976,7 @@ const RaporVM={
   /* Sena 10-29: hatırlatma / paket önerisinin getirisi.
      Hatırlatma (hatirlat, hatirlat+paket) → GERI_DONUS_GUN içinde «geldi» seansı varsa danışan GERİ DÖNDÜ.
      Paket önerisi (paket, hatirlat+paket) → GERI_DONUS_GUN içinde paket satışı varsa PAKET ALDI.
-     Kazandırılan ciro: temastan sonraki KAZANC_GUN içindeki paketsiz «geldi» seans ücretleri + o arada satılan paketler
+     Sonrasında gelen ciro: temastan sonraki KAZANC_GUN içindeki paketsiz «geldi» seans ücretleri + o arada satılan paketler
      (aynı seans/paket iki temasa sayılmaz). Pencere dolmadıysa ve henüz sonuç yoksa «bekleniyor». */
   GERI_DONUS_GUN:60,KAZANC_GUN:90,GERI_KAZANIM_AY:12,
   geriKazanim(ctx){
@@ -6015,7 +6030,7 @@ const RaporVM={
     const tanitim=ulasilan||oneri?('Son '+this.GERI_KAZANIM_AY+' ayda panelin hatırlatmalarıyla '+ulasilan+' danışana ulaştık'
       +(dondu?', '+dondu+' danışan geri döndü (%'+oran+')':'')
       +(oneri?'; '+oneri+' paket önerisinden '+paketAlan+' tanesi satışa dönüştü':'')
-      +(ciro?'. Bu temasların getirdiği: '+num(seans)+' seans, '+money(ciro)+'.':'.')):'';
+      +(ciro?'. Bu temaslardan sonra gelen: '+num(seans)+' seans, '+money(ciro)+'.':'.')):'';
     return {
       bos:!satirlar.length,
       bosMetni:'Henüz ölçülecek temas yok. Ana ekrandaki «Paket öner» ve hatırlatma mesajları gönderildikçe burada sonuçları görünür.',
@@ -6023,7 +6038,7 @@ const RaporVM={
         {ad:'Ulaşılan danışan',deger:num(ulasilan),alt:'hatırlatma gönderilen'},
         {ad:'Geri dönen',deger:num(dondu),alt:sonuclanan>0?'%'+oran+(bekliyor?' · '+bekliyor+' bekleniyor':''):bekliyor?bekliyor+' bekleniyor':'—'},
         {ad:'Paket alan',deger:num(paketAlan),alt:oneri?oneri+' öneriden':'öneri yok'},
-        {ad:'Kazandırılan ciro',deger:money(ciro),alt:num(seans)+' seans'}
+        {ad:'Sonrasında gelen ciro',deger:money(ciro),alt:num(seans)+' seans'}
       ],
       tanitim,satirlar,
       kural:'Temastan sonraki '+G+' gün içinde gelen «geri döndü», paket alan «paket aldı» sayılır; ciro '+K+' günlük pencereden hesaplanır.'
@@ -6187,7 +6202,7 @@ const AyarVM={
       kapat:'Kapat'},
     kurtarma:{etiket:'Yeni kurtarma kodu üret',
       aciklama:'Kurtarma kodu, parolanızı unutursanız verilerinize ulaşmanızı sağlar. Yeni kod üretmek eskisini geçersiz kılar.',
-      onayBaslik:'Yeni kurtarma kodu',onayMesaj:'Eski kurtarma kodunuz artık çalışmaz. Devam edilsin mi?',onayEvet:'Evet, yeni kod üret',
+      onayBaslik:'Yeni kurtarma kodu',onayMesaj:'Eski kurtarma kodunuz artık çalışmaz. Devam edilsin mi?',onayEvet:'Yeni kod üret',
       bekleme:'Hazırlanıyor…'},
     parola:{baslik:'Parolanız',
       aciklamaSena:"Bu yalnız sizin parolanız; Ketty'nin parolasını değiştirmez. Diğer cihazlarınız eşitlendikten sonra yeni parolayı ister.",
@@ -6564,6 +6579,7 @@ const FormVM={
       baslik:ciftEki(s)+s.name,
       metin:u.used+'/'+s.sessions+' seans kullanıldı · kullanılmayan kısım '+money(k),
       iade:String(k),
+      uyari:'Bu işlem geri alınamaz.',
       not:'İade etmediğiniz kısım danışanın hesabında kesinti olarak kalır. İptal edilen paketten bir daha seans düşmez.'
     };
   },
@@ -7094,7 +7110,7 @@ const UI={
   },
 
   /* dolu pencereden çıkış onayı (geri tuşu + Esc ortak yolu) */
-  cikisSor(ust){this.onay('Çıkılsın mı?','Kaydedilmemiş değişiklik var — çıkılsın mı?','Evet, çık',()=>ust.kapat(false),{tehlikeli:true})},
+  cikisSor(ust){this.onay('Çıkılsın mı?','Kaydedilmemiş değişiklik var — çıkılsın mı?','Çık',()=>ust.kapat(false),{tehlikeli:true})},
 
   /* klavye: Esc en üstteki pencereyi kapatır; Tab/Shift+Tab pencere içinde döner */
   odaklanabilirler(m){
@@ -7376,18 +7392,20 @@ const UI={
     sheet.focus({preventScroll:true});
     return ()=>kapat(false);
   },
-  confirm(msg,onYes){
-    this.modal('Emin misiniz?',(m,close)=>{
+  /* secenek {baslik, evet}: eyleme özgü başlık («Randevu silinsin mi?») ve kısa düğme («Sil»); verilmezse eski metinler */
+  confirm(msg,onYes,secenek){
+    const sc=secenek||{};
+    this.modal(sc.baslik||'Emin misiniz?',(m,close)=>{
       m.appendChild(h('p',{style:'color:var(--ink-2);font-size:14px'},msg));
       const acts=h('div.actions');
       acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
-      acts.appendChild(h('button.btn.danger',{onclick:()=>{close();onYes()}},'Evet, sil'));
+      acts.appendChild(h('button.btn.danger',{onclick:()=>{close();onYes()}},sc.evet||'Evet, sil'));
       m.appendChild(acts);
     },{sinif:'onay'});
   },
 
   /* silme dışı onay (D3): başlık, ileti ve onay düğmesi metni verilir; Vazgeç hiçbir şey yapmaz */
-  /* son parametre {tehlikeli:true}: onay düğmesi kırmızı (geri alınamaz işler — «Evet, çık», yedekten geri yükleme) */
+  /* son parametre {tehlikeli:true}: onay düğmesi kırmızı (geri alınamaz işler — «Çık», yedekten geri yükleme) */
   onay(baslik,msg,evetMetni,onYes,secenek){
     const tehlikeli=!!(secenek&&secenek.tehlikeli);
     this.modal(baslik,(m,close)=>{
@@ -7399,18 +7417,32 @@ const UI={
     },{sinif:'onay'});
   },
 
-  toast(msg,type){
-    const t=h('div.toast'+(type?'.'+type:''));t.textContent=msg;
+  /* eylem {eylem:'Geri al', fn, sure}: toast'a 44px'lik düğme; basılınca toast kapanır ve fn çalışır */
+  toast(msg,type,secenek){
+    const t=h('div.toast'+(type?'.'+type:''));
+    const yazi=h('span');yazi.textContent=msg;t.appendChild(yazi);
     if(type==='err')t.setAttribute('role','alert'); /* hata anında okunur; süre de uzun */
     const kap=$('#toasts');
     if(!kap.getAttribute('aria-live'))kap.setAttribute('aria-live','polite');
+    const sc=secenek||{};
+    let zaman=null;
+    const kapat=()=>{clearTimeout(zaman);t.style.opacity=0;t.style.transition='.3s';setTimeout(()=>t.remove(),350)};
+    if(sc.eylem&&sc.fn){
+      const b=h('button.toast-eylem',{type:'button','aria-label':sc.eylem,onclick:()=>{kapat();sc.fn()}},sc.eylem);
+      t.appendChild(b);
+    }
     kap.appendChild(t);
-    setTimeout(()=>{t.style.opacity=0;t.style.transition='.3s';setTimeout(()=>t.remove(),350)},type==='err'?5000:3500);
+    zaman=setTimeout(kapat,sc.sure||(type==='err'?5000:3500));
   },
 
   /* ---- form yardımcıları ---- */
-  field(label,inputEl,help){
+  /* zorunlu (dördüncü parametre, true): etiketin yanına görsel «*» (ekran okuyucuya gizli) + alana aria-required */
+  field(label,inputEl,help,zorunlu){
     const f=h('div.field');const l=h('label');l.textContent=label;f.appendChild(l);f.appendChild(inputEl);
+    if(zorunlu){
+      const y=h('span.zorunlu',{'aria-hidden':'true'});y.textContent='*';l.appendChild(y);
+      inputEl.setAttribute('aria-required','true');
+    }
     const tag=String(inputEl.tagName||'').toLowerCase();
     if(tag==='input'||tag==='select'||tag==='textarea'){ /* etiket ↔ kontrol bağı */
       if(!inputEl.id)inputEl.id='alan-'+(++this.alanNo);
@@ -7537,7 +7569,7 @@ const Forms={
       const source=UI.select(['','Tavsiye','Instagram','Google','Web sitesi','Kurum','Diğer'].map(x=>[x,x||'—']),c.source||'');
       const status=UI.seg([['aktif','Aktif'],['pasif','Ara verdi'],['tamamlandi','Tamamlandı']],c.status||'aktif');
       const notes=h('textarea',{placeholder:'Kısa not (şifreli saklanır)'});notes.value=c.notes||'';
-      m.appendChild(UI.field('Ad soyad',name));
+      m.appendChild(UI.field('Ad soyad',name,null,true));
       m.appendChild(UI.field('Seans türü',tur,'çift terapisinde iki kişi tek kayıt olarak girilir (örn. «Ayşe & Mehmet Yılmaz»)'));
       const fr=h('div.frow');
       fr.appendChild(UI.field('Telefon',phone));
@@ -7595,14 +7627,14 @@ const Forms={
         if(!existing&&c2){const b=$$('button',turSec)[(c2.tur==='cift')?1:0];if(b&&turSec.dataset.value!==(c2.tur||'bireysel'))b.click()}
         if(fee.value==='')turYer();
       });
-      m.appendChild(UI.field('Danışan',client));
+      m.appendChild(UI.field('Danışan',client,null,true));
       /* — listede olmayan danışanı buradan ekle — */
       let newMode=false;
       const nName=UI.input({placeholder:'Ad Soyad',autocomplete:'off'});
       const nPhone=UI.input({placeholder:'05xx xxx xx xx',type:'tel',autocomplete:'off'});
       const newBox=h('div.hide',{style:'background:var(--brand-soft);border-radius:13px;padding:12px 13px 4px;margin:-6px 0 13px'});
       const nfr=h('div.frow');
-      nfr.appendChild(UI.field('Yeni danışanın adı',nName));
+      nfr.appendChild(UI.field('Yeni danışanın adı',nName,null,true));
       nfr.appendChild(UI.field('Telefon (isteğe bağlı)',nPhone));
       newBox.appendChild(nfr);
       const toggle=h('button',{type:'button',style:'font-size:12.5px;font-weight:650;color:var(--brand);margin:-8px 0 12px;padding:2px 0'},'＋ Listede yok mu? Yeni danışan ekle');
@@ -7615,7 +7647,7 @@ const Forms={
       });
       m.appendChild(toggle);
       m.appendChild(newBox);
-      const fr=h('div.frow');fr.appendChild(UI.field('Tarih',date));fr.appendChild(UI.field('Saat',time));
+      const fr=h('div.frow');fr.appendChild(UI.field('Tarih',date,null,true));fr.appendChild(UI.field('Saat',time));
       m.appendChild(fr);
       m.appendChild(UI.field('Seans türü',turSec));
       const fr2=h('div.frow');fr2.appendChild(UI.field('Ücret (₺)',fee,'boş bırakılırsa danışanın / seans türünün ücreti kullanılır'));
@@ -7625,7 +7657,7 @@ const Forms={
       m.appendChild(UI.field('Not',note));
       const acts=h('div.actions');
       if(existing){
-        const del=h('button.btn.danger.icon',{'aria-label':'Sil',onclick:()=>UI.confirm('Bu randevu silinsin mi?',()=>{const r=Islem.randevuSil(existing.id);close();UI.render();UI.toast(r.mesaj,'ok')})});
+        const del=h('button.btn.danger.icon',{'aria-label':'Sil',onclick:()=>UI.confirm('Bu randevu silinsin mi?',()=>{const r=Islem.randevuSil(existing.id);close();UI.render();UI.toast(r.mesaj,'ok')},{baslik:'Randevu silinsin mi?',evet:'Sil'})});
         del.appendChild(icon('trash'));acts.appendChild(del);
       }
       acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
@@ -7719,8 +7751,8 @@ const Forms={
       };
       client.addEventListener('change',()=>showBal(false));
       m.appendChild(UI.field('Tür',tur));
-      m.appendChild(UI.field('Danışan',client));m.appendChild(balInfo);
-      const fr=h('div.frow');fr.appendChild(UI.field('Tutar (₺)',amount));fr.appendChild(UI.field('Tarih',date));
+      m.appendChild(UI.field('Danışan',client,null,true));m.appendChild(balInfo);
+      const fr=h('div.frow');fr.appendChild(UI.field('Tutar (₺)',amount,null,true));fr.appendChild(UI.field('Tarih',date,null,true));
       m.appendChild(fr);
       m.appendChild(UI.field('Yöntem',method));
       m.appendChild(UI.field('Not',note));
@@ -7746,13 +7778,15 @@ const Forms={
       const bilgi=h('div.alert.warn',{style:'margin-bottom:12px'});
       const bd=h('div');const b=h('b');b.textContent=o.baslik;bd.appendChild(b);
       const sm=h('small');sm.textContent=o.metin;bd.appendChild(sm);bilgi.appendChild(bd);m.appendChild(bilgi);
+      const uyari=h('div.alert.crit.iptal-uyari',{style:'margin-bottom:12px'});
+      const ub=h('b');ub.textContent=o.uyari;uyari.appendChild(ub);m.appendChild(uyari);
       const iade=UI.input({value:o.iade,type:'number',inputmode:'numeric'});
       const method=UI.seg([['nakit','Nakit'],['havale','Havale/EFT'],['kart','Kart']],'nakit');
       m.appendChild(UI.field('İade edilecek tutar (₺)',iade,o.not));
       m.appendChild(UI.field('İade yöntemi',method));
       const acts=h('div.actions');
       acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
-      acts.appendChild(h('button.btn.danger',{onclick:()=>{
+      acts.appendChild(h('button.btn.danger-dolu',{onclick:()=>{
         const r=Islem.paketIptal(saleId,{iade:iade.value,tarih:todayStr(),method:method.dataset.value});
         if(!r.ok)return UI.formHatasi(m,r,{iade,tarih:iade});
         close();UI.toast(r.mesaj,'ok');UI.render();
@@ -7769,9 +7803,9 @@ const Forms={
       const amount=UI.input({type:'number',inputmode:'numeric',placeholder:'örn. 500'});
       const date=UI.input({value:todayStr(),type:'date'});
       const note=UI.input({placeholder:'örn. rapor ücreti, indirim…'});
-      m.appendChild(UI.field('Danışan',client));
+      m.appendChild(UI.field('Danışan',client,null,true));
       m.appendChild(UI.field('Tür',tur));
-      const fr=h('div.frow');fr.appendChild(UI.field('Tutar (₺)',amount));fr.appendChild(UI.field('Tarih',date));
+      const fr=h('div.frow');fr.appendChild(UI.field('Tutar (₺)',amount,null,true));fr.appendChild(UI.field('Tarih',date,null,true));
       m.appendChild(fr);
       m.appendChild(UI.field('Açıklama',note));
       const acts=h('div.actions');
@@ -7801,13 +7835,13 @@ const Forms={
       const date=UI.input({value:t.date||todayStr(),type:'date'});
       const note=UI.input({value:t.note||'',placeholder:'isteğe bağlı'});
       m.appendChild(UI.field('Tür',typeSeg));
-      const fr=h('div.frow');fr.appendChild(UI.field('Kategori',cat));fr.appendChild(UI.field('Tutar (₺)',amount));
+      const fr=h('div.frow');fr.appendChild(UI.field('Kategori',cat));fr.appendChild(UI.field('Tutar (₺)',amount,null,true));
       m.appendChild(fr);
-      m.appendChild(UI.field('Tarih',date));
+      m.appendChild(UI.field('Tarih',date,null,true));
       m.appendChild(UI.field('Not',note));
       const acts=h('div.actions');
       if(existing){
-        const del=h('button.btn.danger.icon',{'aria-label':'Sil',onclick:()=>UI.confirm('Bu kayıt silinsin mi?',()=>{const r=Islem.islemSil(existing.id);close();UI.render();UI.toast(r.mesaj,'ok')})});
+        const del=h('button.btn.danger.icon',{'aria-label':'Sil',onclick:()=>UI.confirm('Bu kayıt silinsin mi?',()=>{const r=Islem.islemSil(existing.id);close();UI.render();UI.toast(r.mesaj,'ok')},{baslik:'Kayıt silinsin mi?',evet:'Sil'})});
         del.appendChild(icon('trash'));acts.appendChild(del);
       }
       acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
@@ -7829,14 +7863,14 @@ const Forms={
       const cat=UI.select(FormVM.tekrarlayanKategorileri().map(x=>[x,x]),r.category||'Kira');
       const amount=UI.input({value:r.amount||'',type:'number',inputmode:'numeric'});
       const day=UI.input({value:r.dayOfMonth||1,type:'number',min:1,max:28});
-      m.appendChild(UI.field('Ad',name));
+      m.appendChild(UI.field('Ad',name,null,true));
       m.appendChild(UI.field('Tür',typeSeg));
-      const fr=h('div.frow');fr.appendChild(UI.field('Kategori',cat));fr.appendChild(UI.field('Tutar (₺)',amount));
+      const fr=h('div.frow');fr.appendChild(UI.field('Kategori',cat));fr.appendChild(UI.field('Tutar (₺)',amount,null,true));
       m.appendChild(fr);
       m.appendChild(UI.field('Her ayın hangi günü?',day,'1–28 arası; panel o gün yaklaşınca hatırlatır'));
       const acts=h('div.actions');
       if(existing){
-        const del=h('button.btn.danger.icon',{'aria-label':'Sil',onclick:()=>UI.confirm('Silinsin mi?',()=>{const r=Islem.tekrarlayanSil(existing.id);close();UI.render();UI.toast(r.mesaj,'ok')})});
+        const del=h('button.btn.danger.icon',{'aria-label':'Sil',onclick:()=>UI.confirm('Silinsin mi?',()=>{const r=Islem.tekrarlayanSil(existing.id);close();UI.render();UI.toast(r.mesaj,'ok')},{baslik:'Tekrarlayan ödeme silinsin mi?',evet:'Sil'})});
         del.appendChild(icon('trash'));acts.appendChild(del);
       }
       acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
@@ -7866,15 +7900,15 @@ const Forms={
         hb.textContent=o.baslik;hs.textContent=o.alt;
       };
       sessions.addEventListener('input',refresh);price.addEventListener('input',refresh);
-      m.appendChild(UI.field('Paket adı',name));
+      m.appendChild(UI.field('Paket adı',name,null,true));
       m.appendChild(UI.field('Seans türü',tur,'çift terapisi paketi yalnız çift seanslarından düşer'));
-      const fr=h('div.frow');fr.appendChild(UI.field('Seans sayısı',sessions));fr.appendChild(UI.field('Toplam fiyat (₺)',price));
+      const fr=h('div.frow');fr.appendChild(UI.field('Seans sayısı',sessions,null,true));fr.appendChild(UI.field('Toplam fiyat (₺)',price,null,true));
       m.appendChild(fr);
       m.appendChild(hint);refresh();
       m.appendChild(UI.field('Açıklama',note));
       const acts=h('div.actions');
       if(existing){
-        const del=h('button.btn.danger.icon',{'aria-label':'Sil',onclick:()=>UI.confirm('Bu paket tanımı silinsin mi? (Satılmış paketler etkilenmez)',()=>{const r=Islem.paketSil(existing.id);close();UI.render();UI.toast(r.mesaj,'ok')})});
+        const del=h('button.btn.danger.icon',{'aria-label':'Sil',onclick:()=>UI.confirm('Bu paket tanımı silinsin mi? (Satılmış paketler etkilenmez)',()=>{const r=Islem.paketSil(existing.id);close();UI.render();UI.toast(r.mesaj,'ok')},{baslik:'Paket tanımı silinsin mi?',evet:'Sil'})});
         del.appendChild(icon('trash'));acts.appendChild(del);
       }
       acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
@@ -7982,13 +8016,13 @@ const Forms={
       const fillFrom=()=>{const t=FormVM.paketSablonu(tpl.value);if(t){sessions.value=t.sessions;price.value=t.price;turSec(t.tur)}};
       tpl.addEventListener('change',fillFrom);
       if(packageId)fillFrom();
-      m.appendChild(UI.field('Danışan',client));
+      m.appendChild(UI.field('Danışan',client,null,true));
       if(tpls.length)m.appendChild(UI.field('Hazır paket',tpl,'seçince seans ve fiyat otomatik dolar; elle de değiştirebilirsiniz'));
       else m.appendChild(h('p',{style:'font-size:12px;color:var(--muted);margin:-4px 0 12px'},'İpucu: Finans → Paketler bölümünde hazır paketler tasarlayabilirsiniz.'));
       m.appendChild(UI.field('Seans türü',tur,'çift terapisi paketi yalnız çift seanslarından düşer'));
-      const fr=h('div.frow');fr.appendChild(UI.field('Seans sayısı',sessions));fr.appendChild(UI.field('Fiyat (₺)',price));
+      const fr=h('div.frow');fr.appendChild(UI.field('Seans sayısı',sessions,null,true));fr.appendChild(UI.field('Fiyat (₺)',price,null,true));
       m.appendChild(fr);
-      const fr2=h('div.frow');fr2.appendChild(UI.field('Satış tarihi',date));m.appendChild(fr2);
+      const fr2=h('div.frow');fr2.appendChild(UI.field('Satış tarihi',date,null,true));m.appendChild(fr2);
       m.appendChild(UI.field('Ödeme yöntemi',method,'ödeme, tahsilat/gelir olarak otomatik işlenir'));
       const acts=h('div.actions');
       acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
@@ -8009,12 +8043,12 @@ const Forms={
       const name=UI.input({value:w.name||'',placeholder:'Ad Soyad',autocomplete:'off'});
       const phone=UI.input({value:w.phone||'',placeholder:'05xx…',type:'tel',autocomplete:'off'});
       const note=UI.input({value:w.note||'',placeholder:'tercih ettiği gün/saat vb.'});
-      m.appendChild(UI.field('Ad',name));
+      m.appendChild(UI.field('Ad',name,null,true));
       m.appendChild(UI.field('Telefon',phone));
       m.appendChild(UI.field('Not',note));
       const acts=h('div.actions');
       if(existing){
-        const del=h('button.btn.danger.icon',{'aria-label':'Sil',onclick:()=>UI.confirm((existing.name||'Bu kişi')+' bekleme listesinden çıkarılsın mı?',()=>{const r=Islem.beklemeSil(existing.id);close();UI.render();UI.toast(r.mesaj,'ok')})});
+        const del=h('button.btn.danger.icon',{'aria-label':'Sil',onclick:()=>UI.confirm((existing.name||'Bu kişi')+' bekleme listesinden çıkarılsın mı?',()=>{const r=Islem.beklemeSil(existing.id);close();UI.render();UI.toast(r.mesaj,'ok')},{baslik:'Bekleme kaydı silinsin mi?',evet:'Sil'})});
         del.appendChild(icon('trash'));acts.appendChild(del);
       }
       acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
@@ -8105,7 +8139,7 @@ UI.register('dash',main=>{
   const gkGrid=h('div.grid.cols-3');
   const mini=(lbl,val)=>{const d=h('div',{style:'text-align:center;padding:8px;border-radius:12px;background:var(--card-2)'});
     const vv=h('div',{style:'font-size:19px;font-weight:700'});vv.textContent=val;
-    const l=h('div',{style:'font-size:11.5px;color:var(--muted);font-weight:600'});l.textContent=lbl;
+    const l=h('div',{style:'font-size:12px;color:var(--muted);font-weight:600'});l.textContent=lbl;
     d.appendChild(vv);d.appendChild(l);return d};
   gkGrid.appendChild(mini('Yapılan seans',v.ozet.seans));
   gkGrid.appendChild(mini('Tahsilat',v.ozet.tahsilat));
@@ -8281,7 +8315,7 @@ UI.register('cal',main=>{
         cell.appendChild(ev);
       });
       if(hc.dahaMetni){const mo=h('div.more');mo.textContent=hc.dahaMetni;cell.appendChild(mo)}
-      if(hc.toplamMetni){const tp=h('div.toplam');tp.textContent=hc.toplamMetni;cell.appendChild(tp)} /* K3.8: yalnız dar ekranda görünür (CSS) */
+      if(hc.toplamMetni){const tp=h('div.toplam');tp.textContent=String(hc.toplamSayi);tp.appendChild(h('span.kelime',{},' randevu'));cell.appendChild(tp)} /* dört göz 2: 12px'te «randevu» hücreye sığmıyordu → görünen yalnız sayı, kelime ekran okuyucuya */ /* K3.8: yalnız dar ekranda görünür (CSS) */
       if(hc.noktalar.length){
         const pips=h('div.pips');
         hc.noktalar.forEach(s=>{const p=h('i.pip');p.style.background=stColor[s]||'var(--s1)';pips.appendChild(p)});
@@ -8449,7 +8483,7 @@ function clientDetail(main,id){
   /* hesap dökümü */
   const acc=h('div.card');
   const ah=h('h3');ah.appendChild(icon('wallet'));ah.appendChild(document.createTextNode('Hesap dökümü'));acc.appendChild(ah);
-  const dkA=h('div',{style:'font-size:11.5px;color:var(--muted);margin:-4px 0 8px'});dkA.textContent=t.dokum.aciklama;acc.appendChild(dkA);
+  const dkA=h('div',{style:'font-size:12px;color:var(--muted);margin:-4px 0 8px'});dkA.textContent=t.dokum.aciklama;acc.appendChild(dkA);
   if(t.dokum.bos){const e=h('div.empty');e.textContent='Henüz hareket yok';acc.appendChild(e)}
   t.dokum.satirlar.forEach(en=>{
     const row=h('div.row');
@@ -8486,7 +8520,7 @@ function clientDetail(main,id){
   }
 
   const danger=h('div.mt',{style:'text-align:right'});
-  const del=h('button.btn.danger.sm',{onclick:()=>UI.confirm(t.silOnayi,()=>{const r=Islem.danisanSil(id);UI.go('clients');UI.toast(r.mesaj,'ok')})},'Danışanı sil');
+  const del=h('button.btn.danger.sm',{onclick:()=>UI.confirm(t.silOnayi,()=>{const r=Islem.danisanSil(id);UI.go('clients');UI.toast(r.mesaj,'ok')},{baslik:'Danışan silinsin mi?',evet:'Sil'})},'Danışanı sil');
   danger.appendChild(del);main.appendChild(danger);
 }
 /* ==== ekran_hatirlatma.js ==== */
@@ -8521,7 +8555,10 @@ UI.register('hatir',main=>{
         wa.appendChild(icon('wa'));end.appendChild(wa)}
       else end.appendChild(h('button.btn.soft.sm',{onclick:e=>{e.stopPropagation();Forms.paketOner(s.id,'yalniz')},'aria-label':'Mesaj hazırla – '+s.ad},'Mesaj')); /* A10: telefonsuz danışana da mesaj (kopyalanır) */
       if(!s.ulasildi)end.appendChild(h('button.btn.ghost.sm',{'aria-label':'Ulaşıldı olarak işaretle – '+s.ad,onclick:e=>{e.stopPropagation();
-        const r=Islem.ulasildiIsaretle(s.id);UI.toast(r.mesaj,r.ok?'ok':'err');ciz()}},'Ulaşıldı'));
+        const r=Islem.ulasildiIsaretle(s.id);
+        if(r.ok)UI.toast(s.ad+' ulaşıldı olarak işaretlendi','ok',{eylem:'Geri al',sure:5000,fn:()=>{const g=Islem.ulasildiGeriAl(s.id,r.onceki);UI.toast(g.mesaj,g.ok?'ok':'err');ciz()}});
+        else UI.toast(r.mesaj,'err');
+        ciz()}},'Ulaşıldı'));
       else{const uc=h('span.chip.good');uc.textContent=s.ulasildi;end.appendChild(uc)}
       row.appendChild(av);row.appendChild(bd);row.appendChild(end);kart.appendChild(row);
     };
@@ -8574,7 +8611,7 @@ function openMuhasebe(mk){
   const nv=h('span',{style:'font-variant-numeric:tabular-nums'});nv.textContent=m.net;
   net.appendChild(nl);net.appendChild(nv);sheet.appendChild(net);
 
-  const meta=h('div',{style:'margin-top:18px;font-size:11.5px;color:#555;line-height:1.6'});
+  const meta=h('div',{style:'margin-top:18px;font-size:12px;color:#555;line-height:1.6'});
   meta.textContent=m.not;
   sheet.appendChild(meta);
   kapat=UI.sayfaAc(sheet,'Muhasebe özeti'); /* A14: Esc ve geri tuşu kapatır, odak içeride */
@@ -8623,7 +8660,7 @@ function akisKarti(a){
   const kart=h('div.card.akis');
   const ust=h('div.akis-ust');
   const bas=h('div');
-  const goz=h('div.akis-goz');goz.textContent='01 · PARA HARİTASI · '+akisBuyuk(a.donemEtiketi);
+  const goz=h('div.akis-goz');goz.textContent='PARA HARİTASI · '+akisBuyuk(a.donemEtiketi);
   const bs=h('h3.akis-baslik');bs.textContent='Para nereye gitti?';
   bas.appendChild(goz);bas.appendChild(bs);
   const seg=UI.seg(a.donemler,a.donem,v=>{FinansVM.akisDonemSec(v);UI.render()},'Dönem');
@@ -9032,8 +9069,8 @@ UI.register('set',(main,acilacak)=>{
   gi.appendChild(fr);
   gi.appendChild(UI.field('Asistan adı',asst));
   const fr2=h('div.frow');
-  fr2.appendChild(UI.field('Kaç hafta gelmeyince "uzaklaştı"?',weeks));
-  fr2.appendChild(UI.field('Borç uyarı sınırı (₺)',debtW));
+  fr2.appendChild(UI.field('Kaç hafta gelmeyince "uzaklaştı"?',weeks,null,true));
+  fr2.appendChild(UI.field('Borç uyarı sınırı (₺)',debtW,null,true));
   gi.appendChild(fr2);
   gi.appendChild(UI.field('WhatsApp hatırlatma şablonu',waT,'{ad} {tarih} {saat} {klinik} alanları otomatik doldurulur'));
   gi.appendChild(UI.field('Yalnız hatırlatma mesajı — uzun süredir gelmeyenlere',hatT,'{ad} {klinik} alanları otomatik doldurulur'));
@@ -9168,7 +9205,7 @@ UI.register('set',(main,acilacak)=>{
       dosyaSec.value=''; /* aynı dosya yeniden seçilebilsin */
       const r=Islem.yedekDogrula(metin);
       if(!r.ok)return UI.toast(r.hata,'err');
-      UI.onay('Yedekten geri yükle',AyarVM.yedekOnayMetni(r.ozet),'Evet, değiştir',async()=>{
+      UI.onay('Yedekten geri yükle',AyarVM.yedekOnayMetni(r.ozet),'Değiştir',async()=>{
         const y=await Islem.yedekGeriYukle(r.veri);
         if(!y.ok)return UI.toast(y.hata,'err');
         UI.toast(y.mesaj,'ok');UI.render();
@@ -9188,7 +9225,7 @@ UI.register('set',(main,acilacak)=>{
     'Paneli boş sayfayla değil dolu haliyle görmek için 12 aylık örnek bir pratik yükleyebilirsiniz: 22 danışan, randevu geçmişi, borç–tahsilat akışı, seans paketleri, ofis ve kişisel giderler, bekleme listesi. Gerçek kullanıma geçerken tek tıkla silinir.'));
   const drow=h('div.flex');
   drow.appendChild(h('button.btn.soft',{onclick:()=>{const r=OrnekVeri.yukle();UI.toast(r.mesaj,'ok');UI.go('dash')}},'Örnek veri yükle'));
-  drow.appendChild(h('button.btn.ghost',{onclick:()=>UI.confirm('Örnek olarak eklenen tüm kayıtlar silinsin mi?',()=>{const r=OrnekVeri.temizle();UI.toast(r.mesaj,'ok');UI.go('dash')})},'Örnekleri sil'));
+  drow.appendChild(h('button.btn.ghost',{onclick:()=>UI.confirm('Örnek olarak eklenen tüm kayıtlar silinsin mi?',()=>{const r=OrnekVeri.temizle();UI.toast(r.mesaj,'ok');UI.go('dash')},{baslik:'Örnekler silinsin mi?',evet:'Sil'})},'Örnekleri sil'));
   di.appendChild(drow);
   demo.appendChild(di);main.appendChild(demo);
 
@@ -9200,10 +9237,10 @@ UI.register('set',(main,acilacak)=>{
   si.appendChild(h('h3.ayar-blok-baslik',{},pb.baslik));
   si.appendChild(h('p',{style:'font-size:12.5px;color:var(--ink-2);margin-bottom:10px'},pb.aciklama));
   const np=UI.taslakBagla(UI.input({type:'password',placeholder:pb.yer,autocomplete:'new-password'}));
-  si.appendChild(UI.field(pb.alan,np));
+  si.appendChild(UI.field(pb.alan,np,null,true));
   /* B1: kilit ekranındaki yeni-parola düzeniyle aynı — tekrar kutusu, göster/gizle, ≥8 + eşleşme kuralı (Islem.parolaKontrol), hata pencere içinde */
   const np2=UI.taslakBagla(UI.input({type:'password',placeholder:pb.tekrarYer,autocomplete:'new-password'}));
-  si.appendChild(UI.field(pb.tekrar,np2));
+  si.appendChild(UI.field(pb.tekrar,np2,null,true));
   si.appendChild(Forms.parolaGoster([np,np2]));
   si.appendChild(h('div.form-hata.hide',{role:'alert',id:'ayar-parola-hata'}));
   si.appendChild(h('button.btn',{onclick:async()=>{
