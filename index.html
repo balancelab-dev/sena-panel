@@ -2979,7 +2979,16 @@ function money(n,compact){
   return n.toLocaleString('tr-TR',{maximumFractionDigits:0})+' ₺';
 }
 /* seans ücreti metni: bilerek ücretsiz işaretlenen seans «Ücretsiz» yazar (Sena 10-27) */
-const seansUcreti=a=>a.ucretsiz?'Ücretsiz':money(a.fee);
+const seansUcreti=a=>(a.tur==='cift'?'Çift · ':'')+(a.ucretsiz?'Ücretsiz':money(a.fee));
+/* seans türleri (Sena 10-29): bireysel (settings.defaultFee) · çift terapisi (settings.coupleFee; eski veride yoksa 4500) */
+const SEANS_TURLERI=[['bireysel','Bireysel'],['cift','Çift terapisi']];
+const turUcreti=tur=>{const S=Store.data.settings;
+  if(tur==='cift')return S.coupleFee!=null&&S.coupleFee!==''?Number(S.coupleFee):4500;
+  return Number(S.defaultFee)||0};
+/* randevu ücret kutusu boşsa: danışanın kendi türündeyse danışanın ücreti, başka türde ise o türün standart ücreti */
+const varsayilanUcret=(c,tur)=>{tur=tur||'bireysel';
+  return c&&(c.tur||'bireysel')===tur&&c.fee?Number(c.fee):turUcreti(tur)};
+const PAKET_ONERI_SABLONU='Merhaba {ad}, seanslarımıza daha düzenli devam edebilmeniz için size özel bir paket hazırladık: {seans} seans toplam {fiyat} (seans başı {seansbasi}; normalde {normal}). Dilerseniz bir sonraki görüşmemizde birlikte planlayalım. 🌿 {klinik}';
 const num=n=>(Number(n)||0).toLocaleString('tr-TR');
 
 /* Tarih */
@@ -3351,7 +3360,7 @@ function blankData(){
     schema:1, updatedAt:nowIso(), settingsUpdatedAt:'', // boş yeni veri gerçek ayarı asla ezmesin
     settings:{
       clinicName:'Sena Psikoloji', assistantName:'Ketty',
-      defaultFee:1500, inactiveWeeks:3, debtWarn:3000,
+      defaultFee:1500, coupleFee:4500, inactiveWeeks:3, debtWarn:3000, paketOneriSablonu:PAKET_ONERI_SABLONU,
       incomeCategories:['Seans','Süpervizyon','Eğitim/Atölye','Rapor','Diğer'],
       expenseCategories:['Kira','Elektrik','Su','İnternet','Aidat','Isınma','Malzeme','Vergi/SGK','Muhasebe','Temizlik','Diğer'],
       personalCategories:['Market','Ulaşım','Sağlık','Giyim','Eğlence','Abonelikler','Ev','Diğer'],
@@ -3652,6 +3661,23 @@ const Store={
     return {sonYedekAt:iso,sonYedekGunu,gunOnce,hatirlat:veriVar&&(gunOnce==null||gunOnce>=this.YEDEK_GUN)};
   },
 
+  PAKET_ONERI_ARA:18,PAKET_ONERI_SUSKU:45,
+  /* null | {seans, ara(gün)} — alerts() 5b'nin ölçütü */
+  paketOnerisiDurumu(c,t){
+    t=t||todayStr();
+    if(c.status!=='aktif')return null;
+    if(c.paketOnerisi&&c.paketOnerisi.tarih&&daysBetween(c.paketOnerisi.tarih,t)<this.PAKET_ONERI_SUSKU)return null;
+    if(this.activeSale(c.id))return null;
+    if(this.col('packageSales').some(x=>x.clientId===c.id&&daysBetween(x.date,t)<=90))return null;
+    const bas=addDays(t,-180);
+    const g=this.col('appointments').filter(a=>a.clientId===c.id&&a.status==='geldi'&&a.date>=bas&&a.date<=t)
+      .map(a=>a.date).sort();
+    if(g.length<2)return null;
+    const ara=Math.round(daysBetween(g[0],g[g.length-1])/(g.length-1));
+    if(ara<this.PAKET_ONERI_ARA)return null;
+    return {seans:g.length,ara};
+  },
+
   /* uyarı motoru */
   alerts(){
     const out=[];const t=todayStr();const s=this.data.settings;
@@ -3707,6 +3733,15 @@ const Store={
       else if(u.remaining===1)
         out.push({type:'paket',sev:'info',client:c,title:c.name+' — pakette son seans',
           sub:last.name+': '+u.used+'/'+last.sessions+' kullanıldı'});
+    }
+    /* 5b. paket önerisi (Sena 10-29): aktif, elinde paket yok (son 90 günde paket de almamış), son 6 ayda ≥2 kez gelmiş
+       ama SEYREK (seanslar arası ortalama ≥ PAKET_ONERI_ARA gün; haftalık/2 haftalık düzenliler girmez).
+       Öneri gönderildiyse (c.paketOnerisi) PAKET_ONERI_SUSKU gün tekrar sorulmaz. */
+    for(const c of this.col('clients')){
+      const o=this.paketOnerisiDurumu(c,t);
+      if(o)out.push({type:'paketOner',sev:'info',client:c,
+        title:c.name+' — paket önerilebilir',
+        sub:'Son 6 ayda '+o.seans+' seans, ortalama '+o.ara+' günde bir · paket daha düzenli gelmesini sağlayabilir'});
     }
     /* 6. yarın randevusu olup hatırlatılmamışlar → dashboard ayrı gösteriyor */
     const sevOrder={crit:0,serious:1,warn:2,info:3,good:4};
@@ -4194,30 +4229,31 @@ const Islem={
   /* g: {name,phone,phone2,fee,birthDate,source,status,notes} (phone2: isteğe bağlı ikinci numara — Sena 10-22) · mevcutId: düzenlenen danışanın id'si (yoksa yeni) */
   danisanKaydet(g,mevcutId){
     if(!(g.name||'').trim())return {ok:false,hata:'Ad soyad gerekli',alan:'name'};
-    const rec={name:g.name.trim(),phone:(g.phone||'').trim(),phone2:(g.phone2||'').trim(),fee:Number(g.fee)||0,
+    const rec={name:g.name.trim(),phone:(g.phone||'').trim(),phone2:(g.phone2||'').trim(),fee:Number(g.fee)||0,tur:g.tur==='cift'?'cift':'bireysel',
       birthDate:g.birthDate,source:g.source,status:g.status,notes:g.notes};
     const kayit=mevcutId?Store.update('clients',mevcutId,rec):Store.add('clients',rec);
     return {ok:true,mesaj:mevcutId?'Danışan güncellendi':'Danışan eklendi',kayit};
   },
 
   /* ---------- randevu (V-F2, V-F3, V-F4, V-F5) ---------- */
-  /* g: {clientId,date,time,fee,note,status, tekrar,tekrarSayisi, yeniDanisan, ucretsiz}
+  /* g: {clientId,date,time,fee,tur,note,status, tekrar,tekrarSayisi, yeniDanisan, ucretsiz} — tur: 'bireysel'|'cift'
      ucretsiz: true → ücret 0 + kayıtta ucretsiz:true (bilerek ücretsiz; paketten düşmez — Sena 10-27)
      yeniDanisan: null | {name,phone} ("Listede yok mu?" kutusu açıkken) · tekrar/tekrarSayisi yalnız yeni randevuda okunur */
   randevuKaydet(g,mevcutId){
     const S=Store.data.settings;
     const hata=Islem.randevuDogrula(g);if(hata)return hata;
     let yeniDanisan=null,savedRec=null;const kayitlar=[];
+    const tur=g.tur==='cift'?'cift':'bireysel'; /* Sena 10-29: seans türü */
     const yaz=()=>{
       let cid=g.clientId;
       if(g.yeniDanisan){
         yeniDanisan=Store.add('clients',{name:g.yeniDanisan.name.trim(),phone:(g.yeniDanisan.phone||'').trim(),
-          fee:g.fee!==''?Number(g.fee):S.defaultFee,status:'aktif',birthDate:'',source:'',notes:''});
+          fee:g.fee!==''?Number(g.fee):turUcreti(tur),tur,status:'aktif',birthDate:'',source:'',notes:''});
         cid=yeniDanisan.id;
       }
       const c=Store.find('clients',cid);
-      const f=g.ucretsiz?0:g.fee!==''?Number(g.fee):(c.fee||S.defaultFee);
-      const base={clientId:cid,date:g.date,time:g.time,fee:f,ucretsiz:!!g.ucretsiz,note:g.note,status:g.status};
+      const f=g.ucretsiz?0:g.fee!==''?Number(g.fee):varsayilanUcret(c,tur);
+      const base={clientId:cid,date:g.date,time:g.time,fee:f,tur,ucretsiz:!!g.ucretsiz,note:g.note,status:g.status};
       if(g.ucretsiz)base.packageSaleId=null; /* önceden paketten düşmüşse paketi geri ver */
       if(mevcutId){Store.update('appointments',mevcutId,base);savedRec=Store.find('appointments',mevcutId);kayitlar.push(savedRec)}
       else{
@@ -4358,6 +4394,13 @@ const Islem={
   },
   paketSil(id){Store.remove('packages',id);return {ok:true,mesaj:'Paket tanımı silindi'}}, // satılmış paketlere (packageSales) dokunmaz
 
+  /* ---------- paket önerisi (Sena 10-29) ---------- */
+  /* WhatsApp'a gönderilince danışana yazılır → öneri kartı PAKET_ONERI_SUSKU gün susar */
+  paketOneriGonderildi(clientId,g,bugun){
+    Store.update('clients',clientId,{paketOnerisi:{tarih:bugun||todayStr(),seans:Number(g.sessions)||0,fiyat:Number(g.price)||0,kim:Store.user}});
+    return {ok:true,mesaj:'Paket önerisi WhatsApp\'ta açıldı'};
+  },
+
   /* ---------- paket satışı (V-F17) ---------- */
   /* g: {clientId,packageId,sessions,price,date,method} — satış + aynı tutarda ödeme kaydı */
   paketSat(g){
@@ -4417,6 +4460,7 @@ const Islem={
      ekran kurulurken yakalanan nesne bayatlayabilir). */
   ayarlarKaydet(g){
     Object.assign(Store.data.settings,{clinicName:g.clinicName,assistantName:g.assistantName,defaultFee:Number(g.defaultFee)||0,
+      coupleFee:Number(g.coupleFee)||0,paketOneriSablonu:g.paketOneriSablonu||PAKET_ONERI_SABLONU,
       inactiveWeeks:Number(g.inactiveWeeks)||3,debtWarn:Number(g.debtWarn)||3000,waTemplate:g.waTemplate});
     Store.touchSettings();
     return {ok:true,mesaj:'Kaydedildi'};
@@ -4989,12 +5033,14 @@ const DashVM={
   },
   _uyariSatiri(al,bugun){
     const sev=al.sev==='crit'?'crit':al.sev==='serious'?'serious':al.sev==='good'?'good':al.sev==='info'?'info':'warn';
-    const ikon=al.type==='borc'?'money':al.type==='odeme'?'wallet':al.type==='dogum'||al.type==='paket'?'gift':al.type==='token'?'lock':al.type==='yedek'?'download':'clock';
+    const ikon=al.type==='borc'?'money':al.type==='odeme'?'wallet':al.type==='dogum'||al.type==='paket'||al.type==='paketOner'?'gift':al.type==='token'?'lock':al.type==='yedek'?'download':'clock';
     let eylem=null;
     if(al.client){
       const klinik=Store.data.settings.clinicName;const ilkAd=al.client.name.split(' ')[0];
       if(al.type==='uzak'&&al.client.phone){
         eylem={tur:'wa-uzak',href:waLink(al.client.phone,HatirlatmaVM.waMetni(al.client))};
+      }else if(al.type==='paketOner'){
+        eylem={tur:'paketOner',danisanId:al.client.id,etiket:'Paket öner'}; /* view Forms.paketOner(id) açar */
       }else if(al.type==='dogum'&&al.client.phone){
         eylem={tur:'wa-dogum',href:waLink(al.client.phone,'İyi ki doğdunuz '+ilkAd+'! Nice sağlıklı, huzurlu yaşlara 🎂 '+klinik)};
       }else{
@@ -5305,7 +5351,7 @@ const DanisanVM={
       {etiket:'Toplam seans',deger:num(st.toplam),sinif:''},
       {etiket:'Gelmedi',deger:num(st.noshow),sinif:st.noshow>0?'neg':''},
       {etiket:'Revize / erteleme',deger:num(st.revize),sinif:''},
-      {etiket:'Seans ücreti',deger:money(c.fee||Store.data.settings.defaultFee),sinif:''},
+      {etiket:c.tur==='cift'?'Seans ücreti · Çift':'Seans ücreti',deger:money(varsayilanUcret(c,c.tur)),sinif:''},
       b.kalan>0?{etiket:'Açık bakiye',deger:money(b.kalan),sinif:'neg'}
         :av.fazla>0?{etiket:'Fazla ödeme (alacağı)',deger:money(av.fazla),sinif:'neg'}
         :av.paket>0?{etiket:'Paket peşin ödendi',deger:money(av.paket),sinif:'pos'}
@@ -5847,7 +5893,8 @@ const AyarVM={
   /* Genel bölümü alanlarının başlangıç değerleri (ham: defaultFee vb. yoksa undefined kalır) */
   genelForm(){
     const s=Store.data.settings;
-    return {clinicName:s.clinicName||'',assistantName:s.assistantName||'',defaultFee:s.defaultFee,
+    return {clinicName:s.clinicName||'',assistantName:s.assistantName||'',defaultFee:s.defaultFee,coupleFee:turUcreti('cift'),
+      paketOneriSablonu:s.paketOneriSablonu||PAKET_ONERI_SABLONU,
       inactiveWeeks:s.inactiveWeeks,debtWarn:s.debtWarn,waTemplate:s.waTemplate||''};
   },
 
@@ -6201,10 +6248,10 @@ const FormVM={
 
   /* H-F2: randevu formunda ücret alanının yer tutucusu. Danışan bulunamazsa null (yer tutucuya dokunulmaz).
      Danışanın ücreti yoksa (0/boş) varsayılan seans ücreti. */
-  ucretYerTutucu(clientId){
+  ucretYerTutucu(clientId,tur){
     const c=Store.find('clients',clientId);
-    if(!c)return null;
-    return String(c.fee||Store.data.settings.defaultFee);
+    if(!c)return tur?String(turUcreti(tur)):null;
+    return String(varsayilanUcret(c,tur||c.tur));
   },
 
   /* H-F5: randevu işlem penceresindeki bakiye kutusu. Danışan yoksa null (kutu çizilmez).
@@ -6275,14 +6322,30 @@ const FormVM={
   },
 
   /* H-F10: paket tasarlama canlı önizlemesi. seans/fiyat input'un HAM değerleri (string olabilir). */
-  paketOnizleme(seans,fiyat){
+  paketOnizleme(seans,fiyat,birimUcret){
     const s=Number(seans)||0,f=Number(fiyat)||0;
-    const normal=(Store.data.settings.defaultFee||0)*s;
+    const normal=(birimUcret!=null?Number(birimUcret):(Store.data.settings.defaultFee||0))*s;
     if(s>0&&f>0)return {
       baslik:'Seans başına '+money(Math.round(f/s)),
       alt:normal>f?('Normal fiyata göre '+money(normal-f)+' avantaj (%'+Math.round((1-f/normal)*100)+') — danışana böyle önerin'):'Varsayılan ücretle kıyas: '+money(normal)
     };
     return {baslik:'Seans sayısı ve fiyat girin',alt:'seans başı fiyat ve avantaj burada hesaplanır'};
+  },
+
+  /* Sena 10-29: paket önerisi penceresi. Hazır paket yoksa 4 seans, normal fiyatın %10 altı (100'e yuvarlı) önerilir. */
+  paketOneriBaslangic(clientId){
+    const c=Store.find('clients',clientId);
+    const birim=varsayilanUcret(c,c&&c.tur);
+    const tpls=Store.col('packages');
+    const ilk=tpls[0];
+    return {birim,sessions:ilk?ilk.sessions:4,price:ilk?ilk.price:Math.round(birim*4*0.9/100)*100,packageId:ilk?ilk.id:''};
+  },
+  paketOneriMetni(clientId,seans,fiyat){
+    const c=Store.find('clients',clientId);if(!c)return '';
+    const S=Store.data.settings;const n=Number(seans)||0,f=Number(fiyat)||0;
+    const birim=varsayilanUcret(c,c.tur);
+    const al={ad:c.name.split(' ')[0],seans:String(n),fiyat:money(f),seansbasi:n?money(Math.round(f/n)):'',normal:money(birim*n),klinik:S.clinicName||''};
+    return (S.paketOneriSablonu||PAKET_ONERI_SABLONU).replace(/\{(ad|seans|fiyat|seansbasi|normal|klinik)\}/g,(_,k)=>al[k]);
   },
 
   /* H-F11: paket satışında hazır paket seçilince alanlara kopyalanacak değerler; paket yoksa null */
@@ -7096,12 +7159,16 @@ const Forms={
       const name=UI.input({value:c.name||'',placeholder:'Ad Soyad'});
       const phone=UI.input({value:c.phone||'',placeholder:'05xx xxx xx xx',type:'tel'});
       const phone2=UI.input({value:c.phone2||'',placeholder:'İsteğe bağlı',type:'tel'});
-      const fee=UI.input({value:c.fee!=null?c.fee:Store.data.settings.defaultFee,type:'number',inputmode:'numeric'});
+      const fee=UI.input({value:c.fee!=null?c.fee:turUcreti(c.tur),type:'number',inputmode:'numeric'});
+      /* seans türü (Sena 10-29): tür değişince ücret, elle yazılmadıysa o türün standart ücretine geçer */
+      let feeElle=false;fee.addEventListener('input',()=>{feeElle=true});
+      const tur=UI.seg(SEANS_TURLERI,c.tur||'bireysel',v=>{if(!feeElle)fee.value=turUcreti(v)});
       const birth=UI.input({value:c.birthDate||'',type:'date'});
       const source=UI.select(['','Tavsiye','Instagram','Google','Web sitesi','Kurum','Diğer'].map(x=>[x,x||'—']),c.source||'');
       const status=UI.seg([['aktif','Aktif'],['pasif','Ara verdi'],['tamamlandi','Tamamlandı']],c.status||'aktif');
       const notes=h('textarea',{placeholder:'Kısa not (şifreli saklanır)'});notes.value=c.notes||'';
       m.appendChild(UI.field('Ad soyad',name));
+      m.appendChild(UI.field('Seans türü',tur,'çift terapisinde iki kişi tek kayıt olarak girilir (örn. «Ayşe & Mehmet Yılmaz»)'));
       const fr=h('div.frow');
       fr.appendChild(UI.field('Telefon',phone));
       fr.appendChild(UI.field('Seans ücreti (₺)',fee));
@@ -7116,7 +7183,7 @@ const Forms={
       const acts=h('div.actions');
       acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
       acts.appendChild(h('button.btn',{onclick:()=>{
-        const r=Islem.danisanKaydet({name:name.value,phone:phone.value,phone2:phone2.value,fee:fee.value,
+        const r=Islem.danisanKaydet({name:name.value,phone:phone.value,phone2:phone2.value,fee:fee.value,tur:tur.dataset.value,
           birthDate:birth.value,source:source.value,status:status.dataset.value,notes:notes.value},existing&&existing.id);
         if(!r.ok)return UI.formHatasi(m,r,{name});
         close();UI.toast(r.mesaj,'ok');
@@ -7141,6 +7208,11 @@ const Forms={
       ucretsiz.addEventListener('change',()=>{fee.disabled=ucretsiz.checked});
       const ucretsizEt=h('label.chk');ucretsizEt.appendChild(ucretsiz);ucretsizEt.appendChild(document.createTextNode('Ücretsiz seans'));
       const note=UI.input({value:a.note||'',placeholder:'isteğe bağlı'});
+      /* seans türü (Sena 10-29): varsayılan danışanın türü; tür değişince elle yazılmamış ücret boşalır → türün ücreti kullanılır */
+      const ilkDanisan=Store.find('clients',a.clientId);
+      let feeElle=!!existing;fee.addEventListener('input',()=>{feeElle=true});
+      const turYer=()=>{const yt=FormVM.ucretYerTutucu(client.value,turSec.dataset.value);if(yt!==null)fee.placeholder=yt};
+      const turSec=UI.seg(SEANS_TURLERI,a.tur||(ilkDanisan&&ilkDanisan.tur)||'bireysel',()=>{if(!feeElle)fee.value='';turYer()});
       const status=UI.seg(FormVM.durumSecenekleri(a.status,true),a.status||'planlandi');
       /* tekrar */
       const rep=UI.select([[0,'Tek seferlik'],[1,'Her hafta'],[2,'2 haftada bir']],0);
@@ -7149,8 +7221,9 @@ const Forms={
       repWrap.appendChild(UI.field('Kaç tekrar?',repCount));
       rep.addEventListener('change',()=>repWrap.classList.toggle('hide',rep.value==='0'));
       client.addEventListener('change',()=>{
-        const yt=FormVM.ucretYerTutucu(client.value);
-        if(yt!==null&&fee.value==='')fee.placeholder=yt;
+        const c2=Store.find('clients',client.value);
+        if(!existing&&c2){const b=$$('button',turSec)[(c2.tur==='cift')?1:0];if(b&&turSec.dataset.value!==(c2.tur||'bireysel'))b.click()}
+        if(fee.value==='')turYer();
       });
       m.appendChild(UI.field('Danışan',client));
       /* — listede olmayan danışanı buradan ekle — */
@@ -7174,7 +7247,8 @@ const Forms={
       m.appendChild(newBox);
       const fr=h('div.frow');fr.appendChild(UI.field('Tarih',date));fr.appendChild(UI.field('Saat',time));
       m.appendChild(fr);
-      const fr2=h('div.frow');fr2.appendChild(UI.field('Ücret (₺)',fee,'boş bırakılırsa danışanın ücreti kullanılır'));
+      m.appendChild(UI.field('Seans türü',turSec));
+      const fr2=h('div.frow');fr2.appendChild(UI.field('Ücret (₺)',fee,'boş bırakılırsa danışanın / seans türünün ücreti kullanılır'));
       m.appendChild(fr2);m.appendChild(ucretsizEt);
       m.appendChild(UI.field('Durum',status));
       if(!existing){m.appendChild(UI.field('Tekrar',rep));m.appendChild(repWrap)}
@@ -7186,7 +7260,7 @@ const Forms={
       }
       acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
       acts.appendChild(h('button.btn',{onclick:()=>{
-        const g={clientId:client.value,date:date.value,time:time.value,fee:fee.value,ucretsiz:ucretsiz.checked,
+        const g={clientId:client.value,date:date.value,time:time.value,fee:fee.value,tur:turSec.dataset.value,ucretsiz:ucretsiz.checked,
           note:note.value,status:status.dataset.value,tekrar:rep.value,tekrarSayisi:repCount.value,
           yeniDanisan:newMode?{name:nName.value,phone:nPhone.value}:null};
         const kaydet=()=>{
@@ -7218,7 +7292,7 @@ const Forms={
       if(a.status==='planlandi'){
         const rv=h('button.btn.soft',{style:'width:100%;margin:2px 0 12px',onclick:()=>{
           close();
-          Forms.appointment(null,{clientId:a.clientId,date:a.date,time:a.time,fee:a.fee,note:a.note,baslik:FormVM.ADLAR.randevuErtele},()=>{
+          Forms.appointment(null,{clientId:a.clientId,date:a.date,time:a.time,fee:a.fee,tur:a.tur,note:a.note,baslik:FormVM.ADLAR.randevuErtele},()=>{
             const r=Islem.randevuErtele(a.id);
             UI.toast(r.mesaj,'ok');UI.render();
           });
@@ -7411,6 +7485,51 @@ const Forms={
     });
   },
 
+  /* ---------- paket önerisi (Sena 10-29): paket seç → mesaj hazırlanır → WhatsApp'ta açılır ---------- */
+  paketOner(clientId){
+    const c=Store.find('clients',clientId);if(!c)return;
+    UI.modal('Paket öner — '+c.name,(m,close)=>{
+      const b=FormVM.paketOneriBaslangic(clientId);
+      const tpls=Store.col('packages');
+      const tpl=UI.select([['','Özel paket'],...tpls.map(p=>[p.id,p.name+' · '+p.sessions+' seans · '+money(p.price)])],b.packageId);
+      const sessions=UI.input({value:b.sessions,type:'number',inputmode:'numeric',min:2});
+      const price=UI.input({value:b.price,type:'number',inputmode:'numeric'});
+      const prev=h('div.alert.info',{style:'margin-bottom:12px'});
+      const msg=h('textarea',{rows:6});
+      let msgElle=false;msg.addEventListener('input',()=>{msgElle=true});
+      const yenile=()=>{
+        const o=FormVM.paketOnizleme(sessions.value,price.value,b.birim);
+        prev.textContent='';const bb=h('b');bb.textContent=o.baslik;const ss=h('small');ss.textContent=o.alt;
+        const bd=h('div');bd.appendChild(bb);bd.appendChild(ss);prev.appendChild(bd);
+        if(!msgElle)msg.value=FormVM.paketOneriMetni(clientId,sessions.value,price.value);
+      };
+      tpl.addEventListener('change',()=>{const t=FormVM.paketSablonu(tpl.value);if(t){sessions.value=t.sessions;price.value=t.price}yenile()});
+      sessions.addEventListener('input',yenile);price.addEventListener('input',yenile);
+      if(tpls.length)m.appendChild(UI.field('Paket',tpl));
+      const fr=h('div.frow');fr.appendChild(UI.field('Seans sayısı',sessions));fr.appendChild(UI.field('Paket fiyatı (₺)',price));
+      m.appendChild(fr);m.appendChild(prev);
+      m.appendChild(UI.field('Mesaj',msg,'gönderilmeden önce düzenleyebilirsiniz · kalıp Ayarlar → Genel\'den değişir'));
+      yenile();
+      const acts=h('div.actions');
+      acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
+      if(c.phone){
+        const wa=h('button.btn',{onclick:()=>{
+          if(!(Number(sessions.value)>1)||!(Number(price.value)>0))return UI.toast('Seans sayısı ve fiyat girin','err');
+          window.open(waLink(c.phone,msg.value),'_blank');
+          const r=Islem.paketOneriGonderildi(clientId,{sessions:sessions.value,price:price.value});
+          close();UI.toast(r.mesaj,'ok');UI.render();
+        }});
+        wa.appendChild(icon('wa'));wa.appendChild(document.createTextNode(' WhatsApp\'ta aç'));acts.appendChild(wa);
+      }else{
+        acts.appendChild(h('button.btn',{onclick:()=>{
+          try{navigator.clipboard.writeText(msg.value);UI.toast('Danışanın telefonu yok — mesaj kopyalandı','ok')}
+          catch(e){UI.toast('Danışanın telefonu kayıtlı değil','err')}
+        }},'Mesajı kopyala'));
+      }
+      m.appendChild(acts);
+    });
+  },
+
   /* ---------- paket satışı ---------- */
   sellPackage(clientId,packageId){
     UI.modal(FormVM.ADLAR.paketSat,(m,close)=>{
@@ -7581,6 +7700,8 @@ UI.register('dash',main=>{
         wa.appendChild(icon('wa'));act.appendChild(wa);
       }else if(ey.tur==='ac'){
         act.appendChild(h('button.btn.soft.sm',{onclick:()=>UI.go('clients',ey.danisanId)},ey.etiket));
+      }else if(ey.tur==='paketOner'){
+        act.appendChild(h('button.btn.soft.sm',{onclick:()=>Forms.paketOner(ey.danisanId)},ey.etiket));
       }else if(ey.tur==='ayarlar'){
         act.appendChild(h('button.btn.soft.sm',{onclick:()=>UI.go('set',ey.bolum)},ey.etiket));
       }else if(ey.tur==='randevu'){
@@ -7845,6 +7966,7 @@ function clientDetail(main,id){
   const adj=h('button.btn.ghost.sm',{onclick:()=>Forms.adjustment(id)},'± '+FormVM.ADLAR.duzeltme);acts.appendChild(adj);
   const pk=h('button.btn.ghost.sm',{onclick:()=>Forms.sellPackage(id)});
   pk.appendChild(icon('gift'));pk.appendChild(document.createTextNode(FormVM.ADLAR.paketSat));acts.appendChild(pk);
+  if(!t.aktifPaket||t.aktifPaket.yenile)acts.appendChild(h('button.btn.ghost.sm',{onclick:()=>Forms.paketOner(id)},'Paket öner'));
   main.appendChild(acts);
 
   /* aktif paket durumu */
@@ -8409,22 +8531,27 @@ UI.register('set',(main,acilacak)=>{
   const clinic=UI.taslakBagla(UI.input({value:gf.clinicName}));
   const asst=UI.taslakBagla(UI.input({value:gf.assistantName}));
   const fee=UI.taslakBagla(UI.input({value:gf.defaultFee,type:'number'}));
+  const ciftFee=UI.taslakBagla(UI.input({value:gf.coupleFee,type:'number'}));
+  const pkT=UI.taslakBagla(h('textarea'));pkT.value=gf.paketOneriSablonu;
   const weeks=UI.taslakBagla(UI.input({value:gf.inactiveWeeks,type:'number',min:1,max:12}));
   const debtW=UI.taslakBagla(UI.input({value:gf.debtWarn,type:'number'}));
   const waT=UI.taslakBagla(h('textarea'));waT.value=gf.waTemplate;
   gi.appendChild(UI.field('Klinik / marka adı',clinic));
   const fr=h('div.frow');
-  fr.appendChild(UI.field('Varsayılan seans ücreti (₺)',fee));
-  fr.appendChild(UI.field('Asistan adı',asst));
+  fr.appendChild(UI.field('Bireysel seans ücreti (₺)',fee));
+  fr.appendChild(UI.field('Çift terapisi ücreti (₺)',ciftFee));
   gi.appendChild(fr);
+  gi.appendChild(UI.field('Asistan adı',asst));
   const fr2=h('div.frow');
   fr2.appendChild(UI.field('Kaç hafta gelmeyince "uzaklaştı"?',weeks));
   fr2.appendChild(UI.field('Borç uyarı sınırı (₺)',debtW));
   gi.appendChild(fr2);
   gi.appendChild(UI.field('WhatsApp hatırlatma şablonu',waT,'{ad} {tarih} {saat} {klinik} alanları otomatik doldurulur'));
+  gi.appendChild(UI.field('Paket önerisi mesajı',pkT,'{ad} {seans} {fiyat} {seansbasi} {normal} {klinik} alanları otomatik doldurulur'));
   gi.appendChild(h('button.btn',{onclick:()=>{
     UI.taslakDusur(); /* Islem'in emit'i ekranı normal çizsin */
     const r=Islem.ayarlarKaydet({clinicName:clinic.value,assistantName:asst.value,defaultFee:fee.value,
+      coupleFee:ciftFee.value,paketOneriSablonu:pkT.value,
       inactiveWeeks:weeks.value,debtWarn:debtW.value,waTemplate:waT.value});
     UI.shell();UI.toast(r.mesaj,'ok');
   }},'Kaydet'));
