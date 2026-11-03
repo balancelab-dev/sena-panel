@@ -4439,7 +4439,8 @@ const Islem={
     if(!v||v<=0)return {ok:false,hata:'Geçerli bir tutar girin',alan:'amount'};
     const th=Islem.tarihDenetle(g.date);if(th)return th;
     const kayit=Store.add('payments',{clientId:g.clientId,amount:v,date:g.date,method:g.method,note:g.note});
-    return {ok:true,mesaj:money(v)+' tahsilat kaydedildi',kayit};
+    const kalan=Store.balance(g.clientId).kalan; /* parça ödeme (Ketty 11-03): kalan borç bildirimde söylenir */
+    return {ok:true,mesaj:money(v)+' tahsilat kaydedildi'+(kalan>0?' — kalan borç '+money(kalan):''),kayit};
   },
 
   /* para iadesi (Sena 10-27): fazla ödenen tutar danışana geri verilince. g: {clientId,amount,date,method,note} — amount POZİTİF girilir,
@@ -6568,6 +6569,18 @@ const FormVM={
     return {metin:'Bakiye kapalı — bu giriş avans olur',tutar:null};
   },
 
+  /* parça ödeme (Ketty 11-03): tahsilat penceresinde yazılan tutardan SONRA hesapta ne kalacağı. Yalnız «Tahsilat» türünde
+     ve açık bakiye varken; iade, danışansız, geçersiz tutar ya da bakiye kapalı/avans → '' (satır gizlenir). */
+  odemeSonrasi(clientId,tutar,tur){
+    const n=Number(tutar);
+    if(tur==='iade'||!clientId||!tutar||!Number.isFinite(n)||n<=0)return '';
+    const kalan=Store.balance(clientId).kalan;
+    if(kalan<=0)return '';
+    if(n<kalan)return 'Ödeme sonrası kalan borç: '+money(kalan-n);
+    if(n===kalan)return 'Ödeme sonrası hesap kapanır ✓';
+    return 'Ödeme sonrası '+money(n-kalan)+' avans kalır';
+  },
+
   /* para iadesi (Sena 10-27): tahsilat formunda «Para iadesi» seçiliyken bakiye satırı + önerilen tutar.
      Avans (kalan<0) varsa tutar = avans; yoksa tutar null ve uyarı (iade bakiyeyi borca çevirir). */
   /* paket iptali penceresi (Ketty 10-29): kullanım + önerilen iade (= kullanılmayan kısım, değiştirilebilir). Paket yok/iptal → null */
@@ -7736,7 +7749,11 @@ const Forms={
       /* K3.2: kalan bakiye tutar alanına GERÇEK DEĞER olarak yazılır (kodla yazılan değer 'input' olayı doğurmaz → pencere kirlenmez);
          kullanıcı tutarı kendi yazdıysa danışan değişince üzerine yazılmaz */
       let elleGirildi=false;
+      /* parça ödeme (Ketty 11-03): tutarın altında «Ödeme sonrası kalan borç: …» */
+      const sonraEl=h('div.help',{style:'margin:-6px 0 12px'});
+      const showSonra=()=>{sonraEl.textContent=FormVM.odemeSonrasi(client.value,amount.value,tur.dataset.value);sonraEl.hidden=!sonraEl.textContent};
       amount.addEventListener('input',()=>{elleGirildi=true});
+      amount.addEventListener('input',showSonra);
       const baslikEl=m.querySelector('h2 span'),kaydetBtn=h('button.btn',{},'Kaydet');
       const showBal=ilk=>{
         const iade=tur.dataset.value==='iade';
@@ -7746,14 +7763,15 @@ const Forms={
         if(baslikEl)baslikEl.textContent=iade?FormVM.IADE_ADLARI.baslik:FormVM.ADLAR.tahsilat;
         kaydetBtn.textContent=iade?FormVM.IADE_ADLARI.dugme:'Kaydet';
         balInfo.style.color=b.uyari?'var(--warn)':'';balInfo.style.fontWeight=b.uyari?'650':'';
-        if(ilk&&amount.value)return; /* açılışta çağıranın önerdiği tutar korunur */
-        amount.value=FormVM.tahsilatTutari(client.value,elleGirildi,amount.value,tur.dataset.value);
+        if(!(ilk&&amount.value)) /* açılışta çağıranın önerdiği tutar korunur */
+          amount.value=FormVM.tahsilatTutari(client.value,elleGirildi,amount.value,tur.dataset.value);
+        showSonra();
       };
       client.addEventListener('change',()=>showBal(false));
       m.appendChild(UI.field('Tür',tur));
       m.appendChild(UI.field('Danışan',client,null,true));m.appendChild(balInfo);
       const fr=h('div.frow');fr.appendChild(UI.field('Tutar (₺)',amount,null,true));fr.appendChild(UI.field('Tarih',date,null,true));
-      m.appendChild(fr);
+      m.appendChild(fr);m.appendChild(sonraEl);
       m.appendChild(UI.field('Yöntem',method));
       m.appendChild(UI.field('Not',note));
       showBal(true);
