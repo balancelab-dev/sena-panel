@@ -6542,16 +6542,19 @@ const FormVM={
 
   /* H-F5: randevu işlem penceresindeki bakiye kutusu. Danışan yoksa null (kutu çizilmez).
      sinif: 'warn' (kalan>0) | 'good' (kapalı ya da avans) */
-  bakiyeOzeti(clientId){
+  bakiyeOzeti(clientId,randevu){
     const c=Store.find('clients',clientId);
     if(!c)return null;
     const b=Store.balance(c.id);
     const av=Store.avansDokumu(c.id);
     /* Sena 10-29: avans «Hesap kapalı» diye gizlenmez — paket peşini ile fazla ödeme ayrı söylenir */
     const paketMetni=av.paket>0?' · pakette '+av.paketSeans+' seans peşin ödendi ('+money(av.paket)+')':'';
+    /* Ketty 11-03: ödeme, seans «Geldi» işaretlenmeden girildi → «danışanın alacağı» değil, ne yapılacağı söylenir */
+    const isaretsiz=randevu&&randevu.status==='planlandi'&&randevu.date<=todayStr();
     return {
       sinif:b.kalan>0||av.fazla>0?'warn':'good',
       baslik:b.kalan>0?'Açık bakiye: '+money(b.kalan)
+        :av.fazla>0&&isaretsiz?'Ödeme alındı ('+money(av.fazla)+') — seansı «Geldi» işaretleyin'
         :av.fazla>0?'Fazla ödeme: '+money(av.fazla)+' — danışanın alacağı'
         :av.paket>0?'Paketten peşin ödendi ✓':'Hesap kapalı ✓',
       alt:'Toplam '+money(b.borc)+' işlendi · '+money(b.oden)+' ödendi'+paketMetni
@@ -7697,10 +7700,22 @@ const Forms={
   apptActions(a){
     const c=Store.find('clients',a.clientId);
     UI.modal((c?c.name:'')+' · '+fmtD(a.date)+' '+(a.time||''),(m,close)=>{
+      const bakiyeYeri=h('div');
+      /* Ketty 11-03: kutu durum değişince yeniden çizilir (eskiden «Geldi» sonrası «Fazla ödeme» yazısı kalıyordu) */
+      const bakiyeCiz=()=>{
+        bakiyeYeri.textContent='';
+        const bo=FormVM.bakiyeOzeti(a.clientId,Store.find('appointments',a.id));
+        if(!bo)return;
+        const info=h('div.alert.'+bo.sinif);
+        const ico=h('div.ico');ico.appendChild(icon('money'));info.appendChild(ico);
+        const bd=h('div');const bb=h('b');bb.textContent=bo.baslik;
+        bd.appendChild(bb);const ss=h('small');ss.textContent=bo.alt;bd.appendChild(ss);
+        info.appendChild(bd);bakiyeYeri.appendChild(info);
+      };
       const stSeg=UI.seg(FormVM.durumSecenekleri(a.status),a.status,v=>{
         const r=Islem.randevuDurumu(a.id,v);
         UI.toast(r.ok?r.mesaj:r.hata,r.ok?'ok':'err');
-        UI.render();
+        UI.render();bakiyeCiz();
       });
       m.appendChild(UI.field('Seans durumu',stSeg));
       /* ertele / revize: eski kayıt "Revize" olarak saklanır, yeni tarih açılır */
@@ -7715,14 +7730,7 @@ const Forms={
         rv.appendChild(icon('repeat'));rv.appendChild(document.createTextNode('Ertele / Revize et — yeni tarih ver'));
         m.appendChild(rv);
       }
-      const bo=FormVM.bakiyeOzeti(a.clientId);
-      if(bo){
-        const info=h('div.alert.'+bo.sinif);
-        const ico=h('div.ico');ico.appendChild(icon('money'));info.appendChild(ico);
-        const bd=h('div');const bb=h('b');bb.textContent=bo.baslik;
-        bd.appendChild(bb);const ss=h('small');ss.textContent=bo.alt;bd.appendChild(ss);
-        info.appendChild(bd);m.appendChild(info);
-      }
+      bakiyeCiz();m.appendChild(bakiyeYeri);
       const acts=h('div.actions');
       acts.appendChild(h('button.btn.soft',{onclick:()=>{close();Forms.appointment(a)}},'Düzenle'));
       if(c)acts.appendChild(h('button.btn',{onclick:()=>{close();Forms.payment(c.id,FormVM.tahsilatBakiyesi(c.id).tutar)}},FormVM.ADLAR.tahsilat)); // Sena 10-29: seans ücreti değil açık bakiye önerilir (paketli seansa ikinci tahsilat olmasın)
