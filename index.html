@@ -6521,7 +6521,7 @@ const FormVM={
      View'lar adı BURADAN okur; yeni bir ad gerekirse buraya eklenir, view'a gömülmez. */
   /* tahsilat penceresi «Para iadesi» seçilince (dört göz 2. tur B5): başlık + kaydet düğmesi iade olarak okunur. ADLAR'a girmez (o sözlük kilitli). */
   IADE_ADLARI:{baslik:'Para iadesi',dugme:'İadeyi kaydet'},
-  KISISEL_ADLARI:{ekle:'Kişisel randevu',duzenle:'Kişisel randevuyu düzenle'},
+  KISISEL_ADLARI:{duzenle:'Kişisel randevuyu düzenle'},
 
   ADLAR:{
     tahsilat:'Tahsilat al',
@@ -6538,6 +6538,8 @@ const FormVM={
     kisiselHarcama:'Kişisel harcama',
     giderAlt:'ofis / iş gideri',
     kisiselAlt:'market, giyim… iş dışı',
+    kisiselRandevu:'Kişisel randevu',
+    kisiselRandevuAlt:'Sena için, saat dolu görünür',
     randevuErtele:'Randevuyu ertele — yeni tarih'
   },
 
@@ -6583,7 +6585,7 @@ const FormVM={
   /* KUL2: Hızlı işlem menüsünün satırları — SIRALI ADLAR anahtarları (hangi satır var + sıra VM'de; view yalnız anahtar → ikon/ton/eylem/alt yazı bağlar).
      «Kişisel harcama» yalnız Gizlilik izin verirse. user verilmezse Store.user. */
   hizliIslemler(user){
-    const l=['randevuEkle','tahsilat','giderEkle'];
+    const l=['randevuEkle','kisiselRandevu','tahsilat','giderEkle'];
     if(Gizlilik.kisiselGorur(user||Store.user))l.push('kisiselHarcama');
     l.push('gelirEkle','paketSat','danisanEkle');
     return l;
@@ -7597,6 +7599,7 @@ const UI={
       const A=FormVM.ADLAR;
       const BAG={
         randevuEkle:['cal','sky',()=>Forms.appointment()],
+        kisiselRandevu:['cal','blush',()=>Forms.kisiselRandevu(),A.kisiselRandevuAlt],
         tahsilat:['money','sage',()=>Forms.payment()],
         giderEkle:['wallet','blush',()=>Forms.transaction('gider'),A.giderAlt],
         kisiselHarcama:['heart','blush',()=>Forms.transaction('kisisel'),A.kisiselAlt],
@@ -7765,7 +7768,7 @@ const Forms={
   /* Sena'nın kişisel randevusu: Ketty ya da Sena girer; saat dolu sayılır, sebep takvimde görünür */
   kisiselRandevu(existing,preset){
     const a=existing||preset||{};
-    UI.modal(existing?FormVM.KISISEL_ADLARI.duzenle:FormVM.KISISEL_ADLARI.ekle,(m,close)=>{
+    UI.modal(existing?FormVM.KISISEL_ADLARI.duzenle:FormVM.ADLAR.kisiselRandevu,(m,close)=>{
       const date=UI.input({value:a.date||todayStr(),type:'date'});
       const time=UI.input({value:a.time||'10:00',type:'time'});
       const sebep=UI.input({value:a.note||'',placeholder:'örn. Diş hekimi'});
@@ -8361,7 +8364,7 @@ UI.register('cal',main=>{
   top.appendChild(h('div.grow'));
   const add=h('button.btn',{onclick:()=>Forms.appointment(null,{date:TakvimVM.capa})});
   add.appendChild(icon('plus'));add.appendChild(document.createTextNode(FormVM.ADLAR.randevuEkle));
-  top.appendChild(h('button.btn.soft',{onclick:()=>Forms.kisiselRandevu(null,{date:TakvimVM.capa})},FormVM.KISISEL_ADLARI.ekle));
+  top.appendChild(h('button.btn.soft',{onclick:()=>Forms.kisiselRandevu(null,{date:TakvimVM.capa})},FormVM.ADLAR.kisiselRandevu));
   top.appendChild(add);
   main.appendChild(top);
 
