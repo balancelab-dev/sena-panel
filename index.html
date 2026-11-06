@@ -46,6 +46,8 @@
   --good:#2e7d4f; --good-soft:#e2efe4;
   --warn:#a06e10; --warn-soft:#f8ecd2;
   --serious:#b4552e; --serious-soft:#f9e5da;
+  /* takvim: yapılmış seans dolu yeşil, ödemesi eksik seans kehribar (Gelmedi'nin şeftalisinden ayrı) */
+  --geldi-bg:#bfe3c8; --eksik:#d08c00; --eksik-bg:#fbd97f;
   --crit:#b13a3a; --crit-soft:#f8e0e0;
   /* çip metni: soft zeminde >=4.5:1 (çipte --good/--warn/--serious yerine; çizgi/nokta renkleri aynı kalır) */
   --good-ink:#2a7449; --warn-ink:#8a5d0a; --serious-ink:#a24b27;
@@ -270,6 +272,14 @@ h3 svg,h2 svg,summary svg{width:17px;height:17px;flex:0 0 17px;color:var(--brand
 .cal-cell .d{font-size:12px;font-weight:650;color:var(--ink-2)}
 .cal-cell .evt{font-size:12px;font-weight:600;padding:1.5px 5px;border-radius:5px;margin-top:2.5px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-cell .evt.planlandi{background:var(--card);box-shadow:inset 0 0 0 1px var(--s1)}
+.cal-cell .evt.geldi{background:var(--geldi-bg)}
+.cal-cell .evt.gelmedi{background:var(--serious-soft)}
+.cal-cell .evt.iptal{background:var(--bg-2)}
+.cal-cell .evt.revize{background:var(--p-lav)}
+.cal-cell .evt.eksik{background:var(--eksik-bg)}
+.cal-cell .evt.kisisel{background:var(--p-blush)}
+@media(min-width:901px){.cal-cell .evt.eksik{display:flex}}
 .cal-cell .more{font-size:12px;color:var(--muted);margin-top:2px;font-weight:600}
 @media(max-width:900px){.cal-cell{min-height:56px;padding:3px 4px}.cal-cell .evt{display:none}
   .cal-cell .pips{display:flex;gap:2.5px;flex-wrap:wrap;margin-top:3px}
@@ -279,19 +289,27 @@ h3 svg,h2 svg,summary svg{width:17px;height:17px;flex:0 0 17px;color:var(--brand
 @media(min-width:901px){.cal-cell .pips{display:none}}
 .day-list .hourblock{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}
 .day-list .hr{width:46px;flex:0 0 46px;text-align:right;font-size:12px;color:var(--muted);font-weight:600;padding-top:8px}
-.appt{flex:1;border-radius:12px;padding:9px 13px;display:flex;align-items:center;gap:10px;cursor:pointer;border-left:4px solid transparent}
+.appt{flex:1;border-radius:12px;padding:9px 13px;display:flex;align-items:center;gap:10px;cursor:pointer;border:1px solid transparent;border-left-width:4px}
 .appt b{font-size:13.5px}
 .appt small{display:block;color:var(--ink-2);font-size:12px}
 .appt .st{margin-left:auto;flex-shrink:0}
-.appt.planlandi{background:var(--p-sky);border-color:var(--s1)}
-.appt.geldi{background:var(--good-soft);border-color:var(--good)}
+/* henüz olmamış seans içi boş, yapılmış seans dolu: yalnız renk tonuna dayanmaz (Gökhan 11-06) */
+.appt.planlandi{background:var(--card);border-color:var(--s1)}
+.appt.geldi{background:var(--geldi-bg);border-color:var(--good)}
 .appt.gelmedi{background:var(--serious-soft);border-color:var(--serious)}
 .appt.iptal{background:var(--bg-2);border-color:var(--muted);opacity:.75}
 .appt.iptal b{text-decoration:line-through}
 .appt.revize{background:var(--p-lav);border-color:var(--s4);opacity:.85}
+.appt.eksik{background:var(--eksik-bg);border-color:var(--eksik)}
+.appt.kisisel{background:var(--p-blush);border-color:var(--s5)}
+.evt-ad{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.eksik-isaret{margin-left:auto;padding-left:4px;flex-shrink:0;font-weight:800}
+
+/* telefonda iki düğme başlığın altında yan yana */
+@media(max-width:520px){.cal-ust h1{width:100%}.cal-ust .grow{display:none}.cal-ust .btn{flex:1;justify-content:center}}
 
 /* hafta görünümü */
-.week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.week-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px} /* uzun yazı sütunu genişletmez, kısalır */
 .week-col{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:7px;min-height:120px}
 .week-col.today{border-color:var(--brand)}
 .week-col .wd{font-size:12px;font-weight:700;color:var(--ink-2);text-align:center;margin-bottom:5px}
@@ -3063,8 +3081,10 @@ function initials(name){return String(name||'?').trim().split(/\s+/).map(w=>w[0]
 const debounce=(fn,ms)=>{let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}};
 
 /* randevu durumu → etiket & çip rengi */
-const ST_LABEL={planlandi:'Planlandı',geldi:'Geldi',gelmedi:'Gelmedi',iptal:'İptal',revize:'Revize'};
-const ST_CHIP={planlandi:'sky',geldi:'good',gelmedi:'serious',iptal:'gray',revize:'lav'};
+const ST_LABEL={planlandi:'Planlandı',geldi:'Geldi',gelmedi:'Gelmedi',iptal:'İptal',revize:'Revize',kisisel:'Sena kişisel'};
+const ST_CHIP={planlandi:'sky',geldi:'good',gelmedi:'serious',iptal:'gray',revize:'lav',kisisel:'blush'};
+/* Sena'nın kişisel randevusu (11-06) seans değildir: kayıtta status 'planlandi' kalır (saati tutar), ekranda kendi durumuyla görünür */
+const gorunenDurum=a=>a.kisisel?'kisisel':a.status;
 const stLabel=s=>ST_LABEL[s]||s;
 const stChip=s=>ST_CHIP[s]||'gray';
 
@@ -3621,6 +3641,32 @@ const Store={
     for(const j of this.col('adjustments'))if(j.clientId===clientId)borc+=Number(j.amount)||0;
     for(const p of this.col('payments'))if(p.clientId===clientId)oden+=Number(p.amount)||0;
     return {borc,oden,kalan:borc-oden};
+  },
+  /* seans bazlı eksik ödeme (Sena/Ketty 11-06): {randevuId:eksikTutar}. Ödeme seansa bağlı değil; danışanın bütün alacağı borç kalemlerine sırayla düşülür:
+     önce paketin kendi kalemleri (paket parası kendi seanslarını karşılar), sonra diğerleri en eskiden yeniye. Yeni kayıt açmaz; eksiklerin toplamı balance().kalan ile çelişmez. */
+  eksikSeanslar(){
+    const kisi={};
+    const al=id=>kisi[id]||(kisi[id]={kredi:0,kalemler:[]});
+    for(const p of this.col('payments'))al(p.clientId).kredi+=Number(p.amount)||0;
+    for(const j of this.col('adjustments')){
+      const t=Number(j.amount)||0;
+      if(t<0)al(j.clientId).kredi-=t;
+      else if(t>0)al(j.clientId).kalemler.push({tutar:t,paket:!!j.packageSaleId,sira:j.date||''});
+    }
+    for(const a of this.col('appointments')){
+      const t=Number(a.fee)||0;
+      if(a.status==='geldi'&&t>0)al(a.clientId).kalemler.push({tutar:t,paket:!!a.packageSaleId,sira:(a.date||'')+' '+(a.time||''),id:a.id});
+    }
+    const out={};
+    for(const k of Object.values(kisi)){
+      let kredi=Math.max(0,k.kredi);
+      k.kalemler.sort((x,y)=>(y.paket-x.paket)||x.sira.localeCompare(y.sira));
+      for(const b of k.kalemler){
+        const dusen=Math.min(kredi,b.tutar);kredi-=dusen;
+        if(b.id&&b.tutar>dusen)out[b.id]=b.tutar-dusen;
+      }
+    }
+    return out;
   },
   /* avansın dökümü (Sena 10-29): kalan<0 iken ne kadarı paketin henüz kullanılmamış seanslarına peşin ödendi, ne kadarı gerçekten fazla ödeme.
      paket = satılan paket bedelleri − paketten düşülen «geldi» seans ücretleri; fazla = avans − paket (≥0) */
@@ -4339,6 +4385,18 @@ const Islem={
   /* g: {clientId,date,time,fee,tur,note,status, tekrar,tekrarSayisi, yeniDanisan, ucretsiz} — tur: 'bireysel'|'cift'
      ucretsiz: true → ücret 0 + kayıtta ucretsiz:true (bilerek ücretsiz; paketten düşmez — Sena 10-27)
      yeniDanisan: null | {name,phone} ("Listede yok mu?" kutusu açıkken) · tekrar/tekrarSayisi yalnız yeni randevuda okunur */
+  /* Sena'nın kişisel randevusu (Sena/Ketty 11-06): danışansız, ücretsiz; sebep note'ta. status 'planlandi' olduğu için saat dolu sayılır (cakisanRandevu). */
+  kisiselDogrula(g){
+    if(!(g.sebep||'').trim())return {ok:false,hata:'Ne için olduğunu yazın',alan:'sebep'};
+    return Islem.tarihDenetle(g.date);
+  },
+  kisiselKaydet(g,mevcutId){
+    const hata=Islem.kisiselDogrula(g);if(hata)return hata;
+    const rec={clientId:null,kisisel:true,date:g.date,time:g.time,note:g.sebep.trim(),status:'planlandi',fee:0};
+    const kayit=mevcutId?Store.update('appointments',mevcutId,rec):Store.add('appointments',rec);
+    return {ok:true,mesaj:'Kişisel randevu kaydedildi',kayit};
+  },
+
   randevuKaydet(g,mevcutId){
     const S=Store.data.settings;
     const hata=Islem.randevuDogrula(g);if(hata)return hata;
@@ -5206,11 +5264,11 @@ const DashVM={
       taban:oncekiSon===oncekiUzunluk?'geçen aya göre':'geçen ayın aynı dönemine göre'};
   },
   _randevuSatiri(a,yarinMi){
-    const c=Store.find('clients',a.clientId);
+    const c=Store.find('clients',a.clientId);const gd=gorunenDurum(a);
     const satir={
-      saat:a.time||'—',ad:c?c.name:'?',
-      altMetin:seansUcreti(a)+(a.note?' · '+a.note:''),
-      durum:a.status,durumSinif:stChip(a.status),durumEtiket:stLabel(a.status),
+      saat:a.time||'—',ad:a.kisisel?a.note:(c?c.name:'?'),
+      altMetin:a.kisisel?'Sena — kişisel':seansUcreti(a)+(a.note?' · '+a.note:''),
+      durum:gd,durumSinif:stChip(gd),durumEtiket:stLabel(gd),
       waGoster:false,waHref:null,
       randevu:a /* view tıklayınca Forms.apptActions(a)'ya verir */
     };
@@ -5258,7 +5316,7 @@ const DashVM={
   ISARETSIZ_TOPLU_ESIK:3,
   _isaretsizSeanslar(t,simdi){
     const ilk=addDays(t,-DashVM.ISARETSIZ_GUN);
-    const liste=Store.col('appointments').filter(a=>a.status==='planlandi'&&a.date>=ilk&&
+    const liste=Store.col('appointments').filter(a=>!a.kisisel&&a.status==='planlandi'&&a.date>=ilk&&
       (a.date<t||(a.date===t&&!!a.time&&a.time<simdi)))
       .sort((a,b)=>a.date===b.date?(a.time||'').localeCompare(b.time||''):(a.date<b.date?-1:1));
     if(!liste.length)return[];
@@ -5397,23 +5455,30 @@ const TakvimVM={
   _gunun(randevular,d){
     return randevular.filter(a=>a.date===d).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
   },
-  _ilkAd(a){const c=Store.find('clients',a.clientId);return c?c.name.split(' ')[0]:'?'},
-  _olay(a){return{metin:(a.time?a.time+' ':'')+TakvimVM._ilkAd(a),durum:a.status,durumEtiket:stLabel(a.status),randevu:a}},
+  _ilkAd(a){if(a.kisisel)return a.note;const c=Store.find('clients',a.clientId);return c?c.name.split(' ')[0]:'?'},
+  _tamAd(a){if(a.kisisel)return a.note;const c=Store.find('clients',a.clientId);return c?c.name:'?'},
+  _eksikMetni(t){return money(t)+' eksik'},
+  /* sinif: kartın CSS sınıfları — durum, ödemesi eksikse «.eksik» eklenir */
+  _sinif(a,t){return gorunenDurum(a)+(t?'.eksik':'')},
+  _olay(a,eksikler){const t=eksikler[a.id]||0;
+    return{metin:(a.time?a.time+' ':'')+TakvimVM._ilkAd(a),durum:gorunenDurum(a),sinif:TakvimVM._sinif(a,t),kisisel:!!a.kisisel,eksikMetni:t?TakvimVM._eksikMetni(t):null,durumEtiket:stLabel(gorunenDurum(a)),randevu:a}},
 
   durum(ctx={}){
     const t=ctx.bugun||todayStr();
     const mod=TakvimVM.mod,capa=TakvimVM.capa;
     const randevular=Store.col('appointments');
     const byDate=d=>TakvimVM._gunun(randevular,d);
+    const eksikler=Store.eksikSeanslar();
+    const olay=a=>TakvimVM._olay(a,eksikler);
     const out={mod,capa,bugun:t,baslik:'',gun:null,hafta:null,ay:null};
 
     if(mod==='day'){
       out.baslik=TakvimVM._gunEtiketi(capa,t)+' · '+fmtD(capa);
       const kayitlar=byDate(capa).map(a=>{
-        const c=Store.find('clients',a.clientId);
-        return{saat:a.time||'—',ad:c?c.name:'?',
-          altMetin:seansUcreti(a)+(a.recurringId?' · 🔁 düzenli':'')+(a.note?' · '+a.note:''),
-          durum:a.status,durumSinif:stChip(a.status),durumEtiket:stLabel(a.status),randevu:a};
+        const t=eksikler[a.id]||0;const gd=gorunenDurum(a);
+        return{saat:a.time||'—',ad:TakvimVM._tamAd(a),
+          altMetin:a.kisisel?'Sena — kişisel':seansUcreti(a)+(t?' · '+TakvimVM._eksikMetni(t):'')+(a.recurringId?' · 🔁 düzenli':'')+(a.note?' · '+a.note:''),
+          durum:gd,sinif:TakvimVM._sinif(a,t),durumSinif:stChip(gd),durumEtiket:stLabel(gd),randevu:a};
       });
       out.gun={bos:!kayitlar.length,bosMetni:'Bu gün için randevu yok',kayitlar};
     }
@@ -5423,11 +5488,11 @@ const TakvimVM={
       const gunler=[],liste=[];
       for(let i=0;i<7;i++){
         const d=addDays(ws,i);const l=byDate(d);
-        gunler.push({tarih:d,kisaAd:GUNLER_K[i],tarihMetni:fmtDShort(d),bugunMu:d===t,olaylar:l.map(TakvimVM._olay)});
+        gunler.push({tarih:d,kisaAd:GUNLER_K[i],tarihMetni:fmtDShort(d),bugunMu:d===t,olaylar:l.map(olay)});
         /* dar ekran listesi: boş günler atlanır */
         if(l.length)liste.push({tarih:d,baslik:GUNLER[i]+' · '+fmtDShort(d),
-          kayitlar:l.map(a=>{const c=Store.find('clients',a.clientId);
-            return{saat:a.time||'—',ad:c?c.name:'?',durum:a.status,durumEtiket:stLabel(a.status),randevu:a}})}); /* A19: durum yalnız renkle belli kalmasın */
+          kayitlar:l.map(a=>{const t=eksikler[a.id]||0;const gd=gorunenDurum(a);
+            return{saat:a.time||'—',ad:TakvimVM._tamAd(a),durum:gd,sinif:TakvimVM._sinif(a,t),eksikMetni:t?TakvimVM._eksikMetni(t):null,durumEtiket:stLabel(gd),randevu:a}})}); /* A19: durum yalnız renkle belli kalmasın */
       }
       out.hafta={gunler,liste,listeBos:!liste.length,listeBosMetni:'Bu hafta randevu yok'};
     }
@@ -5441,14 +5506,14 @@ const TakvimVM={
       for(let i=0;i<42;i++){
         const d=addDays(gridStart,i);const l=byDate(d);
         hucreler.push({tarih:d,gunNo:String(Number(d.slice(8,10))),ayIci:monthKey(d)===mk,bugunMu:d===t,
-          olaylar:l.slice(0,3).map(TakvimVM._olay),
+          olaylar:l.slice(0,3).map(olay),
           dahaMetni:l.length>3?'+'+(l.length-3)+' daha':null,
           toplamMetni:l.length?l.length+' randevu':null,toplamSayi:l.length, /* K3.8: telefonda olay metni gizli → "+N daha" yerine toplam; hangisi görünür CSS'in işi */
-          erisimAdi:fmtD(d)+(l.length?', '+l.length+' randevu':', randevu yok'),
-          noktalar:l.slice(0,5).map(a=>a.status)});
+          erisimAdi:fmtD(d)+(l.length?', '+l.length+' randevu':', randevu yok')+(l.some(a=>eksikler[a.id])?', ödemesi eksik seans var':''),
+          noktalar:l.slice(0,5).map(a=>eksikler[a.id]?'eksik':gorunenDurum(a))});
       }
       out.ay={gunAdlari:GUNLER_K.slice(),hucreler,
-        lejant:['planlandi','geldi','gelmedi','iptal','revize'].map(s=>({durum:s,ad:stLabel(s)}))}; /* K3.8 */
+        lejant:['planlandi','geldi','gelmedi','iptal','revize'].map(s=>({durum:s,ad:stLabel(s)})).concat({durum:'eksik',ad:'Ödemesi eksik'},{durum:'kisisel',ad:stLabel('kisisel')})}; /* K3.8 */
     }
     return out;
   }
@@ -6055,7 +6120,7 @@ const RaporVM={
   durum(ctx){
     const t=(ctx&&ctx.bugun)||todayStr();
     const mk=monthKey(t);
-    const appts=Store.col('appointments');
+    const appts=Store.col('appointments').filter(a=>!a.kisisel); /* Sena'nın kişisel randevusu seans değil */
     const clients=Store.col('clients');
 
     /* H-R1 — son 6 ay (eskiden yeniye) */
@@ -6456,6 +6521,7 @@ const FormVM={
      View'lar adı BURADAN okur; yeni bir ad gerekirse buraya eklenir, view'a gömülmez. */
   /* tahsilat penceresi «Para iadesi» seçilince (dört göz 2. tur B5): başlık + kaydet düğmesi iade olarak okunur. ADLAR'a girmez (o sözlük kilitli). */
   IADE_ADLARI:{baslik:'Para iadesi',dugme:'İadeyi kaydet'},
+  KISISEL_ADLARI:{ekle:'Kişisel randevu',duzenle:'Kişisel randevuyu düzenle'},
 
   ADLAR:{
     tahsilat:'Tahsilat al',
@@ -6485,7 +6551,7 @@ const FormVM={
     const dugme='Yine de kaydet',baslik='Bu saatte randevu var',son=' Yine de kaydedilsin mi?';
     if(c.toplam<=1){
       const k=c.liste[0].kayit;
-      return {baslik,mesaj:k.time+' saatinde '+Store.clientName(k.clientId)+' zaten var.'+son,dugme};
+      return {baslik,mesaj:k.time+' saatinde '+(k.kisisel?'Sena kişisel: '+k.note:Store.clientName(k.clientId))+' zaten var.'+son,dugme};
     }
     const n=c.liste.length;
     const EKLER={1:'i',2:'si',3:'ü',4:'ü',5:'i',6:'sı',7:'si',8:'i',9:'u'},ONLAR={10:'u',20:'si',30:'u',40:'ı',50:'si'};
@@ -7696,8 +7762,41 @@ const Forms={
     });
   },
 
+  /* Sena'nın kişisel randevusu: Ketty ya da Sena girer; saat dolu sayılır, sebep takvimde görünür */
+  kisiselRandevu(existing,preset){
+    const a=existing||preset||{};
+    UI.modal(existing?FormVM.KISISEL_ADLARI.duzenle:FormVM.KISISEL_ADLARI.ekle,(m,close)=>{
+      const date=UI.input({value:a.date||todayStr(),type:'date'});
+      const time=UI.input({value:a.time||'10:00',type:'time'});
+      const sebep=UI.input({value:a.note||'',placeholder:'örn. Diş hekimi'});
+      m.appendChild(UI.field('Tarih',date));
+      m.appendChild(UI.field('Saat',time));
+      m.appendChild(UI.field('Ne için?',sebep,'takvimde bu yazı görünür',true));
+      const acts=h('div.actions');
+      if(existing){
+        const del=h('button.btn.danger.icon',{'aria-label':'Sil',onclick:()=>UI.confirm('Bu kişisel randevu silinsin mi?',()=>{const r=Islem.randevuSil(existing.id);close();UI.render();UI.toast(r.mesaj,'ok')},{baslik:'Randevu silinsin mi?',evet:'Sil'})});
+        del.appendChild(icon('trash'));acts.appendChild(del);
+      }
+      acts.appendChild(h('button.btn.ghost',{onclick:close},'Vazgeç'));
+      acts.appendChild(h('button.btn',{onclick:()=>{
+        const g={date:date.value,time:time.value,sebep:sebep.value};
+        const kaydet=()=>{
+          const r=Islem.kisiselKaydet(g,existing&&existing.id);
+          if(!r.ok)return UI.formHatasi(m,r,{sebep,date});
+          close();UI.toast(r.mesaj,'ok');UI.render();
+        };
+        const hata=Islem.kisiselDogrula(g);
+        if(hata)return UI.formHatasi(m,hata,{sebep,date});
+        const o=FormVM.cakismaOnayi(Islem.cakismalar(g,existing&&existing.id));
+        if(o)UI.onay(o.baslik,o.mesaj,o.dugme,kaydet);else kaydet();
+      }},'Kaydet'));
+      m.appendChild(acts);
+    });
+  },
+
   /* randevu durum değiştirme + hızlı tahsilat */
   apptActions(a){
+    if(a.kisisel)return Forms.kisiselRandevu(a);
     const c=Store.find('clients',a.clientId);
     UI.modal((c?c.name:'')+' · '+fmtD(a.date)+' '+(a.time||''),(m,close)=>{
       const bakiyeYeri=h('div');
@@ -8249,11 +8348,20 @@ UI.register('dash',main=>{
 TakvimVM.mod=window.innerWidth<=900?'day':'week'; /* başlangıç modu DOM bilgisi ister → VM'e view söyler */
 UI.register('cal',main=>{
   const v=TakvimVM.durum();
-  const top=h('div.topbar');
+  /* eksik ödeme yalnız renkle belli olmasın (A19): ad + ₺ işareti; dar sütunda ad kısalır, işaret kesilmez */
+  const olayYaz=(ev,o)=>{
+    if(!o.eksikMetni&&!o.kisisel){ev.textContent=o.metin;return}
+    const ad=h('span.evt-ad');ad.textContent=o.metin;ev.appendChild(ad);
+    if(o.kisisel){ev.title=o.metin;return} /* uzun sebep kartta kısalır, tamamı ipucunda */
+    const is=h('span.eksik-isaret',{'aria-hidden':'true'});is.textContent='₺';ev.appendChild(is);
+    ev.title=o.eksikMetni;
+  };
+  const top=h('div.topbar.cal-ust');
   const h1=h('h1');h1.textContent='Randevular';top.appendChild(h1);
   top.appendChild(h('div.grow'));
   const add=h('button.btn',{onclick:()=>Forms.appointment(null,{date:TakvimVM.capa})});
   add.appendChild(icon('plus'));add.appendChild(document.createTextNode(FormVM.ADLAR.randevuEkle));
+  top.appendChild(h('button.btn.soft',{onclick:()=>Forms.kisiselRandevu(null,{date:TakvimVM.capa})},FormVM.KISISEL_ADLARI.ekle));
   top.appendChild(add);
   main.appendChild(top);
 
@@ -8279,7 +8387,7 @@ UI.register('cal',main=>{
     g.kayitlar.forEach(r=>{
       const blk=h('div.hourblock');
       const hr=h('div.hr');hr.textContent=r.saat;blk.appendChild(hr);
-      const ap=UI.tiklanir(h('div.appt.'+r.durum),()=>Forms.apptActions(r.randevu));
+      const ap=UI.tiklanir(h('div.appt.'+r.sinif),()=>Forms.apptActions(r.randevu));
       const bd=h('div',{style:'min-width:0;flex:1'});
       const bb=h('b');bb.textContent=r.ad;bd.appendChild(bb);
       const ss=h('small');ss.textContent=r.altMetin;bd.appendChild(ss);
@@ -8301,8 +8409,8 @@ UI.register('cal',main=>{
       const wds=h('small');wds.textContent=g.tarihMetni;wd.appendChild(wds);
       col.appendChild(wd);
       g.olaylar.forEach(o=>{
-        const ev=UI.tiklanir(h('div.evt.appt.'+o.durum,{style:'border-left-width:3px'}),()=>Forms.apptActions(o.randevu));
-        ev.textContent=o.metin;ev.setAttribute('aria-label',o.metin+', '+o.durumEtiket); /* A19 */
+        const ev=UI.tiklanir(h('div.evt.appt.'+o.sinif,{style:'border-left-width:3px'}),()=>Forms.apptActions(o.randevu));
+        olayYaz(ev,o);ev.setAttribute('aria-label',o.metin+', '+o.durumEtiket+(o.eksikMetni?', '+o.eksikMetni:'')); /* A19 */
         col.appendChild(ev);
       });
       col.addEventListener('dblclick',()=>Forms.appointment(null,{date:g.tarih}));
@@ -8316,10 +8424,11 @@ UI.register('cal',main=>{
         const dh=h('div',{style:'font-weight:700;font-size:13px;margin:10px 0 5px;color:var(--ink-2)'});
         dh.textContent=gun.baslik;card.appendChild(dh);
         gun.kayitlar.forEach(r=>{
-          const ap=UI.tiklanir(h('div.appt.'+r.durum,{style:'margin-bottom:6px'}),()=>Forms.apptActions(r.randevu));
+          const ap=UI.tiklanir(h('div.appt.'+r.sinif,{style:'margin-bottom:6px'}),()=>Forms.apptActions(r.randevu));
           const tm=h('div',{style:'font-weight:700;font-size:12.5px;min-width:42px'});tm.textContent=r.saat;
           const bd=h('div',{style:'flex:1;min-width:0'});const bb=h('b');bb.textContent=r.ad;bd.appendChild(bb);
-          ap.setAttribute('aria-label',r.saat+' '+r.ad+', '+r.durumEtiket); /* A19 */
+          if(r.eksikMetni){const ss=h('small');ss.textContent=r.eksikMetni;bd.appendChild(ss)}
+          ap.setAttribute('aria-label',r.saat+' '+r.ad+', '+r.durumEtiket+(r.eksikMetni?', '+r.eksikMetni:'')); /* A19 */
           ap.appendChild(tm);ap.appendChild(bd);card.appendChild(ap);
         });
       });
@@ -8331,13 +8440,13 @@ UI.register('cal',main=>{
   else{ /* ay */
     const wrap=h('div.cal-month');
     v.ay.gunAdlari.forEach(g=>wrap.appendChild(h('div.dow',{},g)));
-    const stColor={planlandi:'var(--s1)',geldi:'var(--good)',gelmedi:'var(--serious)',iptal:'var(--muted)',revize:'var(--s4)'};
+    const stColor={planlandi:'var(--s1)',geldi:'var(--good)',gelmedi:'var(--serious)',iptal:'var(--muted)',revize:'var(--s4)',eksik:'var(--eksik)',kisisel:'var(--s5)'};
     v.ay.hucreler.forEach(hc=>{
       const cell=UI.tiklanir(h('div.cal-cell'+(hc.ayIci?'':'.dim')+(hc.bugunMu?'.today':''),{'aria-label':hc.erisimAdi}),()=>{TakvimVM.gunSec(hc.tarih);UI.render()});
       const dd=h('div.d');dd.textContent=hc.gunNo;cell.appendChild(dd);
       hc.olaylar.forEach(o=>{
-        const ev=h('div.evt');ev.style.background=o.durum==='geldi'?'var(--good-soft)':o.durum==='gelmedi'?'var(--serious-soft)':o.durum==='iptal'?'var(--bg-2)':o.durum==='revize'?'var(--p-lav)':'var(--p-sky)';
-        ev.textContent=o.metin;
+        const ev=h('div.evt.'+o.sinif);
+        olayYaz(ev,o);
         cell.appendChild(ev);
       });
       if(hc.dahaMetni){const mo=h('div.more');mo.textContent=hc.dahaMetni;cell.appendChild(mo)}
